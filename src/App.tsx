@@ -83,6 +83,8 @@ const generateProblem = (mode: GameMode): MathProblem => {
   let equationResult = 0;
   let finalAnswer = 0;
   let missing: MissingPart = 'result';
+  let n1 = 0;
+  let n2 = 0;
 
   switch (op) {
     case Operation.Multiply:
@@ -144,6 +146,7 @@ const App: React.FC = () => {
 
   // ვინახავთ მიმდინარე სტატისტიკას რეფში, რომ unload-ის დროს სწორი მონაცემები გავაგზავნოთ
   const statsRef = useRef({ mode: gameMode, total: totalQuestions, correct: totalCorrect });
+  const lastSentStatsRef = useRef({ total: 0, correct: 0 });
 
   useEffect(() => {
     statsRef.current = { mode: gameMode, total: totalQuestions, correct: totalCorrect };
@@ -153,32 +156,51 @@ const App: React.FC = () => {
   const sendDataToSheets = (mode: GameMode, total: number, correct: number) => {
     if (total === 0 || GOOGLE_SHEETS_URL === "YOUR_WEB_APP_URL_HERE") return;
     
-    const modeName = mode === GameMode.Thomthematica ? 'თომთემატიკა' : 'თომრავლების ტაბულა';
+    const deltaTotal = total - lastSentStatsRef.current.total;
+    const deltaCorrect = correct - lastSentStatsRef.current.correct;
     
-    fetch(GOOGLE_SHEETS_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ gameMode: modeName, totalQuestions: total, totalCorrect: correct }),
-      keepalive: true // ⚠️ ეს აუცილებელია, რომ ბრაუზერის გათიშვისას მოთხოვნა არ გაუქმდეს
-    }).catch(console.error);
+    if (deltaTotal <= 0) return; // ახალი მონაცემი არ არის
+    
+    const modeName = mode === GameMode.Thomthematica ? 'თომთემატიკა' : 'თომრავლების ტაბულა';
+    const payload = JSON.stringify({ gameMode: modeName, totalQuestions: deltaTotal, totalCorrect: deltaCorrect });
+    
+    lastSentStatsRef.current = { total, correct };
+
+    // მობილურებისთვის sendBeacon ბევრად საიმედოა
+    if (navigator.sendBeacon) {
+      const blob = new Blob([payload], { type: 'text/plain' });
+      navigator.sendBeacon(GOOGLE_SHEETS_URL, blob);
+    } else {
+      fetch(GOOGLE_SHEETS_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: payload,
+        keepalive: true
+      }).catch(console.error);
+    }
   };
 
-  // ბრაუზერის ან ტაბის გათიშვისას მონაცემების გაგზავნა
+  // ბრაუზერის ან ტაბის გათიშვისას მონაცემების გაგზავნა (მობილურის მხარდაჭერით)
   useEffect(() => {
-    const handleUnload = () => {
-      const { mode, total, correct } = statsRef.current;
-      if (mode && total > 0) {
-        sendDataToSheets(mode, total, correct);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        const { mode, total, correct } = statsRef.current;
+        if (mode && total > 0) sendDataToSheets(mode, total, correct);
       }
     };
 
+    const handleUnload = () => {
+      const { mode, total, correct } = statsRef.current;
+      if (mode && total > 0) sendDataToSheets(mode, total, correct);
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pagehide', handleUnload);
-    window.addEventListener('beforeunload', handleUnload);
     
     return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', handleUnload);
-      window.removeEventListener('beforeunload', handleUnload);
     };
   }, []);
 
@@ -355,6 +377,7 @@ const App: React.FC = () => {
               setTotalQuestions(0);
               setTotalCorrect(0);
               setConsecutivePerfectBlocks(0);
+              lastSentStatsRef.current = { total: 0, correct: 0 }; // ვანულებთ შემდეგი თამაშისთვის
               stopTimer();
             }}
             className="bg-white/60 p-2 rounded-xl hover:bg-white/80 transition-colors border border-indigo-100 text-indigo-900"
@@ -456,3 +479,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
