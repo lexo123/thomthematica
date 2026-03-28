@@ -23,7 +23,7 @@ const INCORRECT_PHRASES = [
 const TIME_LIMIT = 10;
 
 // ⚠️ აქ ჩასვით Google Apps Script-ის ლინკი
-const GOOGLE_SHEETS_URL = "YOUR_WEB_APP_URL_HERE";
+const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxB9xOg2joYnEHXYSwtu3vsjrYDM6MgE7aYWFN2-ulVxLTDCYDfHwKJnUD5iySivKaw9w/exec";
 
 type TextPos = { x: string; y: string; anchor?: "start" | "middle" | "end" };
 type ShapeVariant = { points: string; texts: TextPos[] };
