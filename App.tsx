@@ -52,16 +52,25 @@ const IRREGULAR_HEXAGONS: ShapeVariant[] = [
   { points: "30,20 70,10 95,50 70,90 30,80 5,50", texts: [{x:"50", y:"10", anchor:"middle"}, {x:"90", y:"25"}, {x:"90", y:"80"}, {x:"50", y:"95", anchor:"middle"}, {x:"10", y:"75", anchor:"end"}, {x:"10", y:"30", anchor:"end"}] }
 ];
 
-const generateProblem = (mode: GameMode): MathProblem => {
+const generateProblem = (mode: GameMode, questionIndex: number = 0): MathProblem => {
   if (mode === GameMode.Gethometria) {
-    const figures: FigureType[] = ['square', 'rectangle', 'triangle', 'pentagon', 'hexagon', 'irregular_pentagon', 'irregular_hexagon', 'irregular_quadrilateral'];
-    const figure = figures[Math.floor(Math.random() * figures.length)];
-    
-    let possibleMeasurements: MeasurementType[] = ['perimeter', 'sidesCount', 'anglesCount'];
-    if (figure === 'square' || figure === 'rectangle') {
-      possibleMeasurements.push('area');
+    let figure: FigureType;
+    let measurement: MeasurementType;
+
+    if (questionIndex % 3 === 2) {
+      const areaFigures: FigureType[] = ['square', 'rectangle'];
+      figure = areaFigures[Math.floor(Math.random() * areaFigures.length)];
+      measurement = 'area';
+    } else {
+      const figures: FigureType[] = ['square', 'rectangle', 'triangle', 'pentagon', 'hexagon', 'irregular_pentagon', 'irregular_hexagon', 'irregular_quadrilateral'];
+      figure = figures[Math.floor(Math.random() * figures.length)];
+      
+      let possibleMeasurements: MeasurementType[] = ['perimeter', 'sidesCount', 'anglesCount'];
+      if (figure === 'square' || figure === 'rectangle') {
+        possibleMeasurements.push('area');
+      }
+      measurement = possibleMeasurements[Math.floor(Math.random() * possibleMeasurements.length)];
     }
-    const measurement = possibleMeasurements[Math.floor(Math.random() * possibleMeasurements.length)];
     
     let sides: number[] = [];
     let answer = 0;
@@ -324,7 +333,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (gameMode) {
-      setProblem(generateProblem(gameMode));
+      setProblem(generateProblem(gameMode, questionsInBlock));
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
       }
@@ -435,12 +444,14 @@ const App: React.FC = () => {
     }
 
     if (gameState === GameState.Correct) {
+      let nextIndex = questionsInBlock;
       if (questionsInBlock >= 3) {
         setQuestionsInBlock(0);
         setIsPerfectBlock(true);
+        nextIndex = 0;
       }
 
-      setProblem(generateProblem(gameMode!));
+      setProblem(generateProblem(gameMode!, nextIndex));
       setUserAnswer('');
       setGameState(GameState.Playing);
       setShowRewardImage(false);
