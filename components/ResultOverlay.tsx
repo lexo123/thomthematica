@@ -43,7 +43,7 @@ const SUPER_WINNER_GIFS: ImageConfig[] = [
 // გამარჯვებულის სურათები და ტექსტები
 const WINNER_IMAGES: ImageConfig[] = [
   { 
-    url: "https://drive.google.com/file/d/1wuXKSsGy0YgLtw_oElyzRUYWs60h66ct/view?usp=sharing", 
+    url: "https://drive.google.com/file/d/1PAMnCyTNkzuNwPn_URPTzKHKBRt7DZOk/view?usp=drive_link", 
     caption: "მათემატიკის ნამდვილი მეფე ხარ" // king
   },
   { 
@@ -67,7 +67,7 @@ const WINNER_IMAGES: ImageConfig[] = [
     caption: "ნამდვილი ჯარისკაცი ხარ. ლეიტენანტი ბახტა შენით ამაყობს" // soldier
   },
   { 
-    url: "https://drive.google.com/file/d/1dOFwv6Mfx_7OkqkzJf2RnsUc46kltmAe/view?usp=sharing", 
+    url: "https://drive.google.com/file/d/1W4iqOJAF0FsuLJAPsLEEGeN2R7FssgX_/view?usp=drive_link", 
     caption: "ყოჩაღ, პროფესორო თომა" // professor
   },
   { 
@@ -97,6 +97,14 @@ const WINNER_IMAGES: ImageConfig[] = [
   { 
     url: "https://drive.google.com/file/d/1k2tpbvOBiS1ADxB_xsbk2CK9UcMPYL7m/view?usp=sharing", 
     caption: "სპაიდერმენ, სპაიდერმეეენ!!!" // president
+  },
+  { 
+    url: "https://drive.google.com/file/d/1E-6lu8YKdxgUh5JcJHrMEOqNyFm8-CDR/view?usp=sharing", 
+    caption: "მეცნიერი კაცი ხარ ძმაო" // scientist
+  },
+  { 
+    url: "https://drive.google.com/file/d/1ZYWodsGKRp0C5r9FLz-JS5uqiDW1ZYB9/view?usp=drive_link", 
+    caption: "თომა და მისი ფანები" // ronaldo
   },
 
 ];
@@ -134,6 +142,10 @@ const LOSER_IMAGES: ImageConfig[] = [
   { 
     url: "https://drive.google.com/file/d/1irvOffR2cR3L6Kj_qO9TGCto_1eRUhFo/view?usp=sharing", 
     caption: "თომთემატიკას თუ არ ისწავლი ასეთი გახდები" // homeless
+  },
+  { 
+    url: "https://drive.google.com/file/d/1irvOffR2cR3L6Kj_qO9TGCto_1eRUhFo/view?usp=sharing", 
+    caption: "ბანძი მეცნიერი ყოფილხარ" // badscientist
   },
 
 ];
