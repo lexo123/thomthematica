@@ -136,7 +136,7 @@ const LOSER_IMAGES: ImageConfig[] = [
     caption: "ვის აუცურდა ფეხი ბანანის ქერქზე?" // banana
   },
   { 
-    url: "https://drive.google.com/file/d/137ecw5X7XBn3fsTw6oplzVBX-cKlOlsS/view?usp=sharing", 
+    url: "https://drive.google.com/file/d/1yaj25VqJAl4KZxEQIAILT0Zx72IBVJkV/view?usp=sharing", 
     caption: "ხო ხედავ ამდენი თამაშისგან თავი ტელეფონად გადაგექცა" // phone
   },
   { 
@@ -144,7 +144,7 @@ const LOSER_IMAGES: ImageConfig[] = [
     caption: "თომთემატიკას თუ არ ისწავლი ასეთი გახდები" // homeless
   },
   { 
-    url: "https://drive.google.com/file/d/1irvOffR2cR3L6Kj_qO9TGCto_1eRUhFo/view?usp=sharing", 
+    url: "https://drive.google.com/file/d/1_NHEebrPxb4ZMWZmB6AgADF2RCW9smuY/view?usp=drive_link", 
     caption: "ბანძი მეცნიერი ყოფილხარ" // badscientist
   },
 
