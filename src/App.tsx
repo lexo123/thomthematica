@@ -130,7 +130,13 @@ const App: React.FC = () => {
   // ჯამური ქულების ლოგიკა (დარეფრეშებამდე)
   const [totalQuestions, setTotalQuestions] = useState<number>(0);
   const [totalCorrect, setTotalCorrect] = useState<number>(0);
-
+  // 40-კითხვიანი ბლოკის თრექინგი
+  const [questionsInBlock40, setQuestionsInBlock40] = useState<number>(0);
+  const [correctInBlock40, setCorrectInBlock40] = useState<number>(0);
+  const [lastCompletedBlockCorrectCount, setLastCompletedBlockCorrectCount] = useState<number>(0);
+  const [showWishModal, setShowWishModal] = useState<boolean>(false);
+  const [wishText, setWishText] = useState<string>("");
+  const [isSendingWish, setIsSendingWish] = useState<boolean>(false);
   // ვითვლით ზედიზედ რამდენჯერ მოხდა Perfect Block
   const [consecutivePerfectBlocks, setConsecutivePerfectBlocks] = useState<number>(0);
 
@@ -273,7 +279,12 @@ const App: React.FC = () => {
     // ჯამური სტატისტიკის განახლება
     setTotalQuestions(prev => prev + 1);
     if (isCorrect) setTotalCorrect(prev => prev + 1);
-
+    // 40-კითხვიანი ბლოკის განახლება
+    const nextInBlock40 = questionsInBlock40 + 1;
+    const nextCorrectInBlock40 = correctInBlock40 + (isCorrect ? 1 : 0);
+    
+    setQuestionsInBlock40(nextInBlock40);
+    setCorrectInBlock40(nextCorrectInBlock40);
     if (isCorrect) {
       const nextQuestionsInBlock = questionsInBlock + 1;
       setQuestionsInBlock(nextQuestionsInBlock);
@@ -304,9 +315,23 @@ const App: React.FC = () => {
       setGameState(GameState.Incorrect);
       setShowRewardImage(false);
     }
+    // შემოწმება 40 კითხვის შემდეგ
+    if (nextInBlock40 === 40) {
+      if (nextCorrectInBlock40 >= 39) {
+        setLastCompletedBlockCorrectCount(nextCorrectInBlock40);
+        // ვაჩვენებთ სურვილის ფანჯარას მცირე დაყოვნებით, რომ პასუხის შედეგი გამოჩნდეს
+        setTimeout(() => {
+          setShowWishModal(true);
+        }, 1500);
+      }
+      // ვანულებთ ბლოკს შემდეგი 40-ისთვის
+      setQuestionsInBlock40(0);
+      setCorrectInBlock40(0);
+    }  
   };
 
   const handleNext = () => {
+    if (showWishModal) return; // არ გადავიდეს შემდეგზე სანამ სურვილს არ დაწერს
     if (gameState === GameState.Incorrect) {
       setUserAnswer('');
       setGameState(GameState.Playing);
@@ -331,7 +356,34 @@ const App: React.FC = () => {
       }
     }
   };
+  const sendWishToSheets = async () => {
+    if (!wishText.trim()) return;
 
+    setIsSendingWish(true);
+    // ვაგზავნით შენახულ შედეგს
+    const payload = JSON.stringify({ 
+      gameMode: "🏆 სურვილი (Wish)", 
+      totalQuestions: 40,
+      totalCorrect: lastCompletedBlockCorrectCount,
+      wish: wishText 
+    });
+
+    try {
+      await fetch(GOOGLE_SHEETS_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: payload
+      });
+      setShowWishModal(false);
+      setWishText("");
+      handleNext(); // სურვილის გაგზავნის შემდეგ გადავდივართ შემდეგ კითხვაზე
+    } catch (error) {
+      console.error("ვერ მოხდა სურვილის გაგზავნა:", error);
+    } finally {
+      setIsSendingWish(false);
+    }
+  };
   if (!gameMode) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-4">
@@ -474,6 +526,41 @@ const App: React.FC = () => {
         isPerfectBlock={isPerfectBlock}
         consecutivePerfectBlocks={consecutivePerfectBlocks}
       />
+      {/* სურვილის მოდალური ფანჯარა */}
+      {showWishModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 backdrop-blur-md bg-indigo-900/40">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl text-center border-t-8 border-yellow-400 animate-in fade-in zoom-in duration-300">
+            <div className="text-6xl mb-4">🏆</div>
+            <h2 className="text-3xl font-black text-indigo-900 mb-2">
+              ბრავო თომა!
+            </h2>
+            <p className="text-lg text-gray-600 mb-6">
+              ზედიზედ 40 კითხვიდან {lastCompletedBlockCorrectCount} სწორად გამოიცანი! შენ ნამდვილი გენიოსი ხარ.
+            </p>
+            
+            <div className="text-left mb-6">
+              <label className="block text-sm font-bold text-indigo-900 mb-2 ml-1">
+                დაწერე, რა სურათი გინდა რომ გავაკეთო შემდეგში:
+              </label>
+              <textarea
+                value={wishText}
+                onChange={(e) => setWishText(e.target.value)}
+                placeholder="აბა, რა გავაკეთო"
+                className="w-full p-4 border-4 border-indigo-50 rounded-2xl focus:border-yellow-400 outline-none transition-all placeholder-gray-300 text-lg min-h-[120px]"
+                autoFocus
+              />
+            </div>
+
+            <Button 
+              onClick={sendWishToSheets} 
+              className="w-full text-xl py-4 bg-yellow-400 hover:bg-yellow-500 text-indigo-900"
+              disabled={!wishText.trim() || isSendingWish}
+            >
+              {isSendingWish ? 'იგზავნება...' : 'გააგზავნე'}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
