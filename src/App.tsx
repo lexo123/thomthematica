@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MathProblem, Operation, GameState, MissingPart, GameMode } from './types';
+import { MathProblem, Operation, GameState, MissingPart, GameMode, FigureType, MeasurementType } from './types';
 import { Button } from './components/Button';
 import { ResultOverlay } from './components/ResultOverlay';
 
@@ -288,7 +288,7 @@ const App: React.FC = () => {
 
   // მონაცემების გაგზავნა Google Sheets-ში
   const sendDataToSheets = (mode: GameMode, total: number, correct: number) => {
-    if (total === 0 || GOOGLE_SHEETS_URL === "YOUR_WEB_APP_URL_HERE") return;
+    if (total === 0 || (GOOGLE_SHEETS_URL as string) === "YOUR_WEB_APP_URL_HERE") return;
     
     const deltaTotal = total - lastSentStatsRef.current.total;
     const deltaCorrect = correct - lastSentStatsRef.current.correct;
@@ -496,8 +496,11 @@ const App: React.FC = () => {
 
     setIsSendingWish(true);
     // ვაგზავნით შენახულ შედეგს
+    const modeName = gameMode === GameMode.Thomthematica ? 'თომთემატიკა' : 
+                     gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 'გეთომეტრია';
+
     const payload = JSON.stringify({ 
-      gameMode: "🏆 სურვილი (Wish)", 
+      gameMode: modeName, 
       totalQuestions: 40,
       totalCorrect: lastCompletedBlockCorrectCount,
       wish: wishText 
