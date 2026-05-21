@@ -23,7 +23,7 @@ const INCORRECT_PHRASES = [
 const TIME_LIMIT = 10;
 
 // ⚠️ აქ ჩასვით Google Apps Script-ის ლინკი
-const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxB9xOg2joYnEHXYSwtu3vsjrYDM6MgE7aYWFN2-ulVxLTDCYDfHwKJnUD5iySivKaw9w/exec";
+const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyh3gS70bV2SOdC-wNqUYtkhh4pw8wgeE3ywnJvbGZEuv83x-X9urjVX24O8l3MsZB62w/exec";
 
 type TextPos = { x: string; y: string; anchor?: "start" | "middle" | "end" };
 type ShapeVariant = { points: string; texts: TextPos[] };
@@ -503,23 +503,32 @@ const App: React.FC = () => {
       gameMode: modeName, 
       totalQuestions: 40,
       totalCorrect: lastCompletedBlockCorrectCount,
-      wish: wishText 
+      wish: wishText,
+      wishText: wishText,
+      wish_text: wishText,
+      "სურვილი": wishText,
+      "Wish": wishText,
+      "WishText": wishText
     });
 
     try {
-      // 4 წამიანი თაიმაუტი, რადგან Google Apps Script-ს ხშირად 2-მდე წამი სჭირდება ჩასაწერად
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 4000));
-      const fetchPromise = fetch(GOOGLE_SHEETS_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: payload
-      });
-
-      await Promise.race([fetchPromise, timeoutPromise]);
+      if (navigator.sendBeacon) {
+        const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
+        navigator.sendBeacon(GOOGLE_SHEETS_URL, blob);
+      } else {
+        await fetch(GOOGLE_SHEETS_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: payload,
+          keepalive: true
+        });
+      }
     } catch (error) {
       console.error("ვერ მოხდა სურვილის გაგზავნა:", error);
     } finally {
+      // მცირე დაყოვნება ვიზუალური ეფექტისთვის
+      await new Promise(resolve => setTimeout(resolve, 500));
       setIsSendingWish(false);
       setShowWishModal(false);
       setWishText("");
