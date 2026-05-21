@@ -23,7 +23,7 @@ const INCORRECT_PHRASES = [
 const TIME_LIMIT = 10;
 
 // ⚠️ აქ ჩასვით Google Apps Script-ის ლინკი
-const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxB9xOg2joYnEHXYSwtu3vsjrYDM6MgE7aYWFN2-ulVxLTDCYDfHwKJnUD5iySivKaw9w/exec";
+const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbx9bWWNyrJD_in9u-AWr-MYuDaPng7_Rh019Dx1Cnt04ag-2d_hbJzjYrYN16wCwxduMA/exec";
 
 const generateProblem = (mode: GameMode): MathProblem => {
   if (mode === GameMode.ThomravlebisTabula) {
