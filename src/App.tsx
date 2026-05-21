@@ -23,14 +23,138 @@ const INCORRECT_PHRASES = [
 const TIME_LIMIT = 10;
 
 // ⚠️ აქ ჩასვით Google Apps Script-ის ლინკი
-const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbx9bWWNyrJD_in9u-AWr-MYuDaPng7_Rh019Dx1Cnt04ag-2d_hbJzjYrYN16wCwxduMA/exec";
+const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxB9xOg2joYnEHXYSwtu3vsjrYDM6MgE7aYWFN2-ulVxLTDCYDfHwKJnUD5iySivKaw9w/exec";
 
-const generateProblem = (mode: GameMode): MathProblem => {
+type TextPos = { x: string; y: string; anchor?: "start" | "middle" | "end" };
+type ShapeVariant = { points: string; texts: TextPos[] };
+
+const IRREGULAR_QUADRILATERALS: ShapeVariant[] = [
+  { points: "10,20 90,10 70,90 20,70", texts: [{x:"50", y:"10", anchor:"middle"}, {x:"90", y:"55"}, {x:"45", y:"95", anchor:"middle"}, {x:"5", y:"45", anchor:"end"}] },
+  { points: "20,10 80,30 90,80 10,90", texts: [{x:"50", y:"15", anchor:"middle"}, {x:"95", y:"55"}, {x:"50", y:"95", anchor:"middle"}, {x:"5", y:"50", anchor:"end"}] },
+  { points: "10,40 60,10 90,60 40,90", texts: [{x:"30", y:"20", anchor:"end"}, {x:"85", y:"30"}, {x:"75", y:"85"}, {x:"20", y:"75", anchor:"end"}] },
+  { points: "30,10 90,20 80,90 10,60", texts: [{x:"60", y:"10", anchor:"middle"}, {x:"95", y:"55"}, {x:"45", y:"90", anchor:"middle"}, {x:"10", y:"30", anchor:"end"}] },
+  { points: "10,10 90,40 60,90 20,80", texts: [{x:"50", y:"20", anchor:"middle"}, {x:"85", y:"70"}, {x:"40", y:"95", anchor:"middle"}, {x:"5", y:"45", anchor:"end"}] }
+];
+
+const IRREGULAR_PENTAGONS: ShapeVariant[] = [
+  { points: "40,10 95,20 80,90 10,80 5,40", texts: [{x:"65", y:"10"}, {x:"95", y:"60"}, {x:"45", y:"100", anchor:"middle"}, {x:"0", y:"70", anchor:"end"}, {x:"15", y:"20", anchor:"end"}] },
+  { points: "60,10 90,50 60,90 10,80 20,30", texts: [{x:"80", y:"25"}, {x:"85", y:"75"}, {x:"35", y:"95", anchor:"middle"}, {x:"5", y:"60", anchor:"end"}, {x:"35", y:"15", anchor:"end"}] },
+  { points: "20,20 80,10 90,60 50,90 10,60", texts: [{x:"50", y:"10", anchor:"middle"}, {x:"95", y:"35"}, {x:"75", y:"85"}, {x:"25", y:"85", anchor:"end"}, {x:"5", y:"40", anchor:"end"}] },
+  { points: "30,10 70,20 90,70 40,90 10,50", texts: [{x:"50", y:"10", anchor:"middle"}, {x:"90", y:"40"}, {x:"70", y:"90"}, {x:"20", y:"80", anchor:"end"}, {x:"10", y:"25", anchor:"end"}] },
+  { points: "10,30 50,10 90,40 80,90 20,80", texts: [{x:"30", y:"15", anchor:"end"}, {x:"75", y:"20"}, {x:"95", y:"70"}, {x:"50", y:"95", anchor:"middle"}, {x:"5", y:"60", anchor:"end"}] }
+];
+
+const IRREGULAR_HEXAGONS: ShapeVariant[] = [
+  { points: "30,10 90,5 95,50 70,95 15,85 5,40", texts: [{x:"60", y:"5"}, {x:"100", y:"30"}, {x:"90", y:"80"}, {x:"40", y:"105", anchor:"middle"}, {x:"5", y:"75", anchor:"end"}, {x:"10", y:"20", anchor:"end"}] },
+  { points: "20,20 60,10 90,40 80,80 40,90 10,60", texts: [{x:"40", y:"10", anchor:"middle"}, {x:"80", y:"20"}, {x:"95", y:"65"}, {x:"60", y:"95", anchor:"middle"}, {x:"20", y:"85", anchor:"end"}, {x:"5", y:"40", anchor:"end"}] },
+  { points: "40,10 80,20 90,60 60,90 20,80 10,40", texts: [{x:"60", y:"10", anchor:"middle"}, {x:"95", y:"35"}, {x:"85", y:"85"}, {x:"40", y:"95", anchor:"middle"}, {x:"10", y:"70", anchor:"end"}, {x:"20", y:"20", anchor:"end"}] },
+  { points: "10,40 40,10 80,20 90,70 50,90 20,70", texts: [{x:"20", y:"20", anchor:"end"}, {x:"60", y:"10", anchor:"middle"}, {x:"95", y:"45"}, {x:"75", y:"90"}, {x:"30", y:"90", anchor:"end"}, {x:"5", y:"55", anchor:"end"}] },
+  { points: "30,20 70,10 95,50 70,90 30,80 5,50", texts: [{x:"50", y:"10", anchor:"middle"}, {x:"90", y:"25"}, {x:"90", y:"80"}, {x:"50", y:"95", anchor:"middle"}, {x:"10", y:"75", anchor:"end"}, {x:"10", y:"30", anchor:"end"}] }
+];
+
+const generateProblem = (mode: GameMode, questionIndex: number = 0): MathProblem => {
+  if (mode === GameMode.Gethometria) {
+    let figure: FigureType;
+    let measurement: MeasurementType;
+
+    if (questionIndex % 3 === 2) {
+      const areaFigures: FigureType[] = ['square', 'rectangle'];
+      figure = areaFigures[Math.floor(Math.random() * areaFigures.length)];
+      measurement = 'area';
+    } else {
+      const figures: FigureType[] = ['square', 'rectangle', 'triangle', 'pentagon', 'hexagon', 'irregular_pentagon', 'irregular_hexagon', 'irregular_quadrilateral'];
+      figure = figures[Math.floor(Math.random() * figures.length)];
+      
+      let possibleMeasurements: MeasurementType[] = ['perimeter', 'sidesCount', 'anglesCount'];
+      if (figure === 'square' || figure === 'rectangle') {
+        possibleMeasurements.push('area');
+      }
+      measurement = possibleMeasurements[Math.floor(Math.random() * possibleMeasurements.length)];
+    }
+    
+    let sides: number[] = [];
+    let answer = 0;
+
+    const getSidesAndAngles = (fig: FigureType) => {
+      switch(fig) {
+        case 'triangle': return 3;
+        case 'square': case 'rectangle': case 'irregular_quadrilateral': return 4;
+        case 'pentagon': case 'irregular_pentagon': return 5;
+        case 'hexagon': case 'irregular_hexagon': return 6;
+      }
+    };
+
+    if (measurement === 'sidesCount' || measurement === 'anglesCount') {
+      answer = getSidesAndAngles(figure);
+      // Generate dummy sides for visual consistency if needed, though we hide them
+      const a = Math.floor(Math.random() * 5) + 3;
+      if (figure === 'rectangle') sides = [a, a+2];
+      else if (figure === 'triangle') sides = [a, a, a];
+      else if (figure === 'irregular_pentagon') sides = [a, a+1, a+2, a-1, a];
+      else if (figure === 'irregular_hexagon') sides = [a, a+1, a+2, a-1, a, a+3];
+      else if (figure === 'irregular_quadrilateral') sides = [a, a+1, a+2, a-1];
+      else sides = [a];
+    } else {
+      if (figure === 'square') {
+        const a = Math.floor(Math.random() * 9) + 2; // 2-დან 10-მდე
+        sides = [a];
+        answer = measurement === 'perimeter' ? 4 * a : a * a;
+      } else if (figure === 'rectangle') {
+        const a = Math.floor(Math.random() * 8) + 2;
+        let b = Math.floor(Math.random() * 8) + 2;
+        while (a === b) b = Math.floor(Math.random() * 8) + 2; // არ უნდა იყოს კვადრატი
+        sides = [a, b];
+        answer = measurement === 'perimeter' ? 2 * (a + b) : a * b;
+      } else if (figure === 'triangle') {
+        // ვქმნით ვალიდურ სამკუთხედს (a+b>c, a+c>b, b+c>a)
+        const a = Math.floor(Math.random() * 8) + 3;
+        const b = Math.floor(Math.random() * 8) + 3;
+        const minC = Math.abs(a - b) + 1;
+        const maxC = a + b - 1;
+        const c = Math.floor(Math.random() * (maxC - minC + 1)) + minC;
+        sides = [a, b, c];
+        answer = a + b + c;
+      } else if (figure === 'pentagon') {
+        const a = Math.floor(Math.random() * 6) + 2;
+        sides = [a];
+        answer = 5 * a;
+      } else if (figure === 'hexagon') {
+        const a = Math.floor(Math.random() * 6) + 2;
+        sides = [a];
+        answer = 6 * a;
+      } else if (figure === 'irregular_pentagon') {
+        sides = Array.from({length: 5}, () => Math.floor(Math.random() * 6) + 2);
+        answer = sides.reduce((sum, val) => sum + val, 0);
+      } else if (figure === 'irregular_hexagon') {
+        sides = Array.from({length: 6}, () => Math.floor(Math.random() * 6) + 2);
+        answer = sides.reduce((sum, val) => sum + val, 0);
+      } else if (figure === 'irregular_quadrilateral') {
+        sides = Array.from({length: 4}, () => Math.floor(Math.random() * 6) + 2);
+        answer = sides.reduce((sum, val) => sum + val, 0);
+      }
+    }
+
+    let shapeVariant: number | undefined;
+    if (figure.startsWith('irregular_')) {
+      shapeVariant = Math.floor(Math.random() * 5);
+    }
+
+    return {
+      category: 'geometry',
+      figure,
+      measurement,
+      sides,
+      shapeVariant,
+      answer
+    };
+  }
+
   if (mode === GameMode.ThomravlebisTabula) {
     const n1 = Math.floor(Math.random() * 11); // 0-10
     const n2 = Math.floor(Math.random() * 11); // 0-10
     const equationResult = n1 * n2;
     return {
+      category: 'math',
       num1: n1,
       num2: n2,
       operation: Operation.Multiply,
@@ -66,6 +190,7 @@ const generateProblem = (mode: GameMode): MathProblem => {
 
       if (tempAns >= 0) {
         return { 
+          category: 'math',
           num1: n1, 
           num2: n2, 
           num3: n3, 
@@ -108,6 +233,7 @@ const generateProblem = (mode: GameMode): MathProblem => {
   }
 
   return { 
+    category: 'math',
     num1: n1, 
     num2: n2, 
     operation: op, 
@@ -130,6 +256,7 @@ const App: React.FC = () => {
   // ჯამური ქულების ლოგიკა (დარეფრეშებამდე)
   const [totalQuestions, setTotalQuestions] = useState<number>(0);
   const [totalCorrect, setTotalCorrect] = useState<number>(0);
+
   // 40-კითხვიანი ბლოკის თრექინგი
   const [questionsInBlock40, setQuestionsInBlock40] = useState<number>(0);
   const [correctInBlock40, setCorrectInBlock40] = useState<number>(0);
@@ -137,6 +264,7 @@ const App: React.FC = () => {
   const [showWishModal, setShowWishModal] = useState<boolean>(false);
   const [wishText, setWishText] = useState<string>("");
   const [isSendingWish, setIsSendingWish] = useState<boolean>(false);
+
   // ვითვლით ზედიზედ რამდენჯერ მოხდა Perfect Block
   const [consecutivePerfectBlocks, setConsecutivePerfectBlocks] = useState<number>(0);
 
@@ -167,7 +295,8 @@ const App: React.FC = () => {
     
     if (deltaTotal <= 0) return; // ახალი მონაცემი არ არის
     
-    const modeName = mode === GameMode.Thomthematica ? 'თომთემატიკა' : 'თომრავლების ტაბულა';
+    const modeName = mode === GameMode.Thomthematica ? 'თომთემატიკა' : 
+                     mode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 'გეთომეტრია';
     const payload = JSON.stringify({ gameMode: modeName, totalQuestions: deltaTotal, totalCorrect: deltaCorrect });
     
     lastSentStatsRef.current = { total, correct };
@@ -212,7 +341,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (gameMode) {
-      setProblem(generateProblem(gameMode));
+      setProblem(generateProblem(gameMode, questionsInBlock));
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
       }
@@ -279,12 +408,14 @@ const App: React.FC = () => {
     // ჯამური სტატისტიკის განახლება
     setTotalQuestions(prev => prev + 1);
     if (isCorrect) setTotalCorrect(prev => prev + 1);
+
     // 40-კითხვიანი ბლოკის განახლება
     const nextInBlock40 = questionsInBlock40 + 1;
     const nextCorrectInBlock40 = correctInBlock40 + (isCorrect ? 1 : 0);
     
     setQuestionsInBlock40(nextInBlock40);
     setCorrectInBlock40(nextCorrectInBlock40);
+
     if (isCorrect) {
       const nextQuestionsInBlock = questionsInBlock + 1;
       setQuestionsInBlock(nextQuestionsInBlock);
@@ -315,6 +446,7 @@ const App: React.FC = () => {
       setGameState(GameState.Incorrect);
       setShowRewardImage(false);
     }
+
     // შემოწმება 40 კითხვის შემდეგ
     if (nextInBlock40 === 40) {
       if (nextCorrectInBlock40 >= 39) {
@@ -327,11 +459,11 @@ const App: React.FC = () => {
       // ვანულებთ ბლოკს შემდეგი 40-ისთვის
       setQuestionsInBlock40(0);
       setCorrectInBlock40(0);
-    }  
+    }
   };
 
-  const handleNext = () => {
-    if (showWishModal) return; // არ გადავიდეს შემდეგზე სანამ სურვილს არ დაწერს
+  const handleNext = (force: boolean = false) => {
+    if (showWishModal && !force) return; // არ გადავიდეს შემდეგზე სანამ სურვილს არ დაწერს
     if (gameState === GameState.Incorrect) {
       setUserAnswer('');
       setGameState(GameState.Playing);
@@ -342,12 +474,14 @@ const App: React.FC = () => {
     }
 
     if (gameState === GameState.Correct) {
+      let nextIndex = questionsInBlock;
       if (questionsInBlock >= 3) {
         setQuestionsInBlock(0);
         setIsPerfectBlock(true);
+        nextIndex = 0;
       }
 
-      setProblem(generateProblem(gameMode!));
+      setProblem(generateProblem(gameMode!, nextIndex));
       setUserAnswer('');
       setGameState(GameState.Playing);
       setShowRewardImage(false);
@@ -356,6 +490,7 @@ const App: React.FC = () => {
       }
     }
   };
+
   const sendWishToSheets = async () => {
     if (!wishText.trim()) return;
 
@@ -369,21 +504,26 @@ const App: React.FC = () => {
     });
 
     try {
-      await fetch(GOOGLE_SHEETS_URL, {
+      // 1.2 წამიანი თაიმაუტი, რომ კავშირის პრობლემისას თამაში არ გაიჭედოს
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1200));
+      const fetchPromise = fetch(GOOGLE_SHEETS_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: payload
       });
-      setShowWishModal(false);
-      setWishText("");
-      handleNext(); // სურვილის გაგზავნის შემდეგ გადავდივართ შემდეგ კითხვაზე
+
+      await Promise.race([fetchPromise, timeoutPromise]);
     } catch (error) {
       console.error("ვერ მოხდა სურვილის გაგზავნა:", error);
     } finally {
       setIsSendingWish(false);
+      setShowWishModal(false);
+      setWishText("");
+      handleNext(true); // ნებისმიერ შემთხვევაში გადავდივართ შემდეგ კითხვაზე ფორსირებულად
     }
   };
+
   if (!gameMode) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-4">
@@ -403,6 +543,12 @@ const App: React.FC = () => {
               className="text-xl py-6 bg-purple-600 hover:bg-purple-700"
             >
               თომრავლების ტაბულა
+            </Button>
+            <Button 
+              onClick={() => setGameMode(GameMode.Gethometria)}
+              className="text-xl py-6 bg-green-600 hover:bg-green-700"
+            >
+              გეთომეტრია 📐
             </Button>
           </div>
         </div>
@@ -438,7 +584,8 @@ const App: React.FC = () => {
             🏠
           </button>
           <h1 className="text-xl md:text-4xl font-black text-indigo-900 tracking-tight">
-            {gameMode === GameMode.Thomthematica ? 'თომთემატიკა 👑' : 'თომრავლების ტაბულა ✖️'}
+            {gameMode === GameMode.Thomthematica ? 'თომთემატიკა 👑' : 
+             gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა ✖️' : 'გეთომეტრია 📐'}
           </h1>
         </div>
         
@@ -465,33 +612,146 @@ const App: React.FC = () => {
         <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400" />
 
         <div className="text-center space-y-8">
-          <div className="space-y-2">
-            <p className="text-gray-500 font-medium uppercase tracking-wider text-sm">
-              {problem.missingPart === 'result' ? 'გამოთვალე:' : 'იპოვე გამოტოვებული რიცხვი:'}
-            </p>
-            
-            <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 text-5xl md:text-7xl font-black text-gray-800">
-              <span className="text-blue-600">
-                {problem.missingPart === 'num1' ? <span className="text-orange-400">?</span> : problem.num1}
-              </span>
-              <span className="text-purple-500">{problem.operation}</span>
-              <span className="text-blue-600">
-                {problem.missingPart === 'num2' ? <span className="text-orange-400">?</span> : problem.num2}
-              </span>
-              {problem.operation2 && problem.num3 !== undefined && (
-                <>
-                  <span className="text-purple-500">{problem.operation2}</span>
-                  <span className="text-blue-600">{problem.num3}</span>
-                </>
+          {problem.category === 'geometry' ? (
+            <div className="space-y-6">
+              <p className="text-gray-500 font-medium uppercase tracking-wider text-sm md:text-base">
+                {problem.measurement === 'sidesCount' ? 'რამდენი გვერდი აქვს ამ ფიგურას?' : 
+                 problem.measurement === 'anglesCount' ? 'რამდენი კუთხე აქვს ამ ფიგურას?' : (
+                  <>
+                    გამოთვალე {
+                      problem.figure === 'irregular_quadrilateral' ? 'ოთხკუთხედის' : 
+                      problem.figure === 'square' ? 'კვადრატის' : 
+                      problem.figure === 'rectangle' ? 'მართკუთხედის' : 
+                      problem.figure === 'triangle' ? 'სამკუთხედის' : 
+                      (problem.figure === 'pentagon' || problem.figure === 'irregular_pentagon') ? 'ხუთკუთხედის' : 'ექვსკუთხედის'
+                    } <span className="text-indigo-600 font-bold">{problem.measurement === 'perimeter' ? 'პერიმეტრი' : 'ფართობი'}</span>:
+                  </>
+                )}
+              </p>
+              
+              {/* წესიერი ფიგურებისთვის მინიშნება */}
+              {(problem.figure === 'pentagon' || problem.figure === 'hexagon') && problem.measurement === 'perimeter' && (
+                <p className="text-pink-500 font-bold text-sm -mt-4 mb-4">
+                  (ყველა გვერდი ერთმანეთის ტოლია)
+                </p>
               )}
-              {problem.missingPart !== 'result' && (
-                <>
-                  <span className="text-gray-400">=</span>
-                  <span className="text-gray-800">{problem.equationResult}</span>
-                </>
-              )}
+              
+              <div className="relative flex items-center justify-center py-8">
+                {problem.figure === 'square' && (
+                  <div className="relative w-32 h-32 border-4 border-blue-500 bg-blue-100/50 shadow-inner">
+                    {(problem.measurement === 'perimeter' || problem.measurement === 'area') && (
+                      <>
+                        <span className="absolute -top-8 left-1/2 -translate-x-1/2 font-bold text-2xl text-blue-700">{problem.sides![0]}</span>
+                        <span className="absolute -right-8 top-1/2 -translate-y-1/2 font-bold text-2xl text-blue-700">{problem.sides![0]}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                {problem.figure === 'rectangle' && (
+                  <div className="relative w-48 h-32 border-4 border-green-500 bg-green-100/50 shadow-inner">
+                    {(problem.measurement === 'perimeter' || problem.measurement === 'area') && (
+                      <>
+                        <span className="absolute -top-8 left-1/2 -translate-x-1/2 font-bold text-2xl text-green-700">{problem.sides![0]}</span>
+                        <span className="absolute -right-8 top-1/2 -translate-y-1/2 font-bold text-2xl text-green-700">{problem.sides![1]}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                {problem.figure === 'triangle' && (
+                  <div className="relative w-48 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                      <polygon points="50,10 10,90 90,90" fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" strokeWidth="4" strokeLinejoin="round" />
+                      {problem.measurement === 'perimeter' && (
+                        <>
+                          <text x="20" y="50" className="text-lg font-bold fill-purple-700">{problem.sides![0]}</text>
+                          <text x="80" y="50" className="text-lg font-bold fill-purple-700">{problem.sides![1]}</text>
+                          <text x="50" y="110" className="text-lg font-bold fill-purple-700" textAnchor="middle">{problem.sides![2]}</text>
+                        </>
+                      )}
+                    </svg>
+                  </div>
+                )}
+                {problem.figure === 'pentagon' && (
+                  <div className="relative w-40 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                      <polygon points="50,5 95,38 78,95 22,95 5,38" fill="rgba(236, 72, 153, 0.2)" stroke="#ec4899" strokeWidth="4" strokeLinejoin="round" />
+                      {problem.measurement === 'perimeter' && (
+                        <text x="50" y="110" className="text-lg font-bold fill-pink-600" textAnchor="middle">{problem.sides![0]}</text>
+                      )}
+                    </svg>
+                  </div>
+                )}
+                {problem.figure === 'irregular_pentagon' && (
+                  <div className="relative w-40 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                      <polygon points={IRREGULAR_PENTAGONS[problem.shapeVariant || 0].points} fill="rgba(236, 72, 153, 0.2)" stroke="#ec4899" strokeWidth="4" strokeLinejoin="round" />
+                      {problem.measurement === 'perimeter' && IRREGULAR_PENTAGONS[problem.shapeVariant || 0].texts.map((pos, idx) => (
+                        <text key={idx} x={pos.x} y={pos.y} className="text-sm font-bold fill-pink-600" textAnchor={pos.anchor || "start"}>{problem.sides![idx]}</text>
+                      ))}
+                    </svg>
+                  </div>
+                )}
+                {problem.figure === 'hexagon' && (
+                  <div className="relative w-40 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                      <polygon points="50,5 93,25 93,75 50,95 7,75 7,25" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" strokeWidth="4" strokeLinejoin="round" />
+                      {problem.measurement === 'perimeter' && (
+                        <text x="50" y="110" className="text-lg font-bold fill-amber-600" textAnchor="middle">{problem.sides![0]}</text>
+                      )}
+                    </svg>
+                  </div>
+                )}
+                {problem.figure === 'irregular_hexagon' && (
+                  <div className="relative w-40 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                      <polygon points={IRREGULAR_HEXAGONS[problem.shapeVariant || 0].points} fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" strokeWidth="4" strokeLinejoin="round" />
+                      {problem.measurement === 'perimeter' && IRREGULAR_HEXAGONS[problem.shapeVariant || 0].texts.map((pos, idx) => (
+                        <text key={idx} x={pos.x} y={pos.y} className="text-sm font-bold fill-amber-600" textAnchor={pos.anchor || "start"}>{problem.sides![idx]}</text>
+                      ))}
+                    </svg>
+                  </div>
+                )}
+                {problem.figure === 'irregular_quadrilateral' && (
+                  <div className="relative w-40 h-40">
+                    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
+                      <polygon points={IRREGULAR_QUADRILATERALS[problem.shapeVariant || 0].points} fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" strokeWidth="4" strokeLinejoin="round" />
+                      {problem.measurement === 'perimeter' && IRREGULAR_QUADRILATERALS[problem.shapeVariant || 0].texts.map((pos, idx) => (
+                        <text key={idx} x={pos.x} y={pos.y} className="text-sm font-bold fill-blue-600" textAnchor={pos.anchor || "start"}>{problem.sides![idx]}</text>
+                      ))}
+                    </svg>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-gray-500 font-medium uppercase tracking-wider text-sm">
+                {problem.missingPart === 'result' ? 'გამოთვალე:' : 'იპოვე გამოტოვებული რიცხვი:'}
+              </p>
+              
+              <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 text-5xl md:text-7xl font-black text-gray-800">
+                <span className="text-blue-600">
+                  {problem.missingPart === 'num1' ? <span className="text-orange-400">?</span> : problem.num1}
+                </span>
+                <span className="text-purple-500">{problem.operation}</span>
+                <span className="text-blue-600">
+                  {problem.missingPart === 'num2' ? <span className="text-orange-400">?</span> : problem.num2}
+                </span>
+                {problem.operation2 && problem.num3 !== undefined && (
+                  <>
+                    <span className="text-purple-500">{problem.operation2}</span>
+                    <span className="text-blue-600">{problem.num3}</span>
+                  </>
+                )}
+                {problem.missingPart !== 'result' && (
+                  <>
+                    <span className="text-gray-400">=</span>
+                    <span className="text-gray-800">{problem.equationResult}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="relative">
@@ -526,6 +786,7 @@ const App: React.FC = () => {
         isPerfectBlock={isPerfectBlock}
         consecutivePerfectBlocks={consecutivePerfectBlocks}
       />
+
       {/* სურვილის მოდალური ფანჯარა */}
       {showWishModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 backdrop-blur-md bg-indigo-900/40">

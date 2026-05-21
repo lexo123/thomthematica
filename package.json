@@ -9,8 +9,7 @@
     "build": "vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "npm run build && cd dist && git init && git add . && git commit -m 'deploy' && git remote add origin https://github.com/lexo123/thomthematica.git && git push origin HEAD:site -f && cd .."
   },
   "dependencies": {
     "@google/genai": "^1.32.0",
