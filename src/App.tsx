@@ -507,8 +507,8 @@ const App: React.FC = () => {
     });
 
     try {
-      // 1.2 წამიანი თაიმაუტი, რომ კავშირის პრობლემისას თამაში არ გაიჭედოს
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1200));
+      // 4 წამიანი თაიმაუტი, რადგან Google Apps Script-ს ხშირად 2-მდე წამი სჭირდება ჩასაწერად
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 4000));
       const fetchPromise = fetch(GOOGLE_SHEETS_URL, {
         method: "POST",
         mode: "no-cors",
