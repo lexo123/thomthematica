@@ -1,7 +1,8 @@
 export enum GameMode {
   Thomthematica = 'thomthematica',
   ThomravlebisTabula = 'thomravlebis_tabula',
-  Gethometria = 'gethometria'
+  Gethometria = 'gethometria',
+  Kveshmicera = 'kveshmicera'
 }
 
 export enum Operation {

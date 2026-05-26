@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://lexo123.github.io/thomthematica",
+  "homepage": ".",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview",
-    "deploy": "npm run build && cd dist && git init && git add . && git commit -m 'deploy' && git remote add origin https://github.com/lexo123/thomthematica.git && git push origin HEAD:site -f && cd .."
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@google/genai": "^1.32.0",

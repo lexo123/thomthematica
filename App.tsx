@@ -53,6 +53,23 @@ const IRREGULAR_HEXAGONS: ShapeVariant[] = [
 ];
 
 const generateProblem = (mode: GameMode, questionIndex: number = 0): MathProblem => {
+  if (mode === GameMode.Kveshmicera) {
+    let n1 = Math.floor(Math.random() * 88) + 11; // 11-99
+    let n2 = Math.floor(Math.random() * 88) + 11; // 11-99
+    while (n1 % 10 === 0) n1 = Math.floor(Math.random() * 88) + 11;
+    while (n2 % 10 === 0 || Math.floor(n2 / 10) === 0) n2 = Math.floor(Math.random() * 88) + 11;
+    const ans = n1 * n2;
+    return {
+      category: 'math',
+      num1: n1,
+      num2: n2,
+      operation: Operation.Multiply,
+      answer: ans,
+      missingPart: 'result',
+      equationResult: ans
+    };
+  }
+
   if (mode === GameMode.Gethometria) {
     let figure: FigureType;
     let measurement: MeasurementType;
@@ -248,6 +265,175 @@ const App: React.FC = () => {
   const [problem, setProblem] = useState<MathProblem | null>(null);
   const [userAnswer, setUserAnswer] = useState<string>('');
   const [gameState, setGameState] = useState<GameState>(GameState.Playing);
+
+  const [colMultState, setColMultState] = useState<{
+    r1: string[];
+    r2: string[];
+    res: string[];
+  }>({
+    r1: ['', '', '', ''],
+    r2: ['', '', '', ''],
+    res: ['', '', '', '']
+  });
+
+  const [showKveshValidation, setShowKveshValidation] = useState<boolean>(false);
+  const [hasKveshFailedThisQuestion, setHasKveshFailedThisQuestion] = useState<boolean>(false);
+
+  const getExpectedDigits = (num1: number, num2: number) => {
+    const bOnes = num2 % 10;
+    const bTens = Math.floor(num2 / 10);
+    
+    const r1Val = num1 * bOnes;
+    const r2Val = num1 * bTens;
+    const resVal = num1 * num2;
+    
+    const r1 = [
+      r1Val >= 1000 ? (Math.floor(r1Val / 1000) % 10).toString() : "",
+      r1Val >= 100 ? (Math.floor(r1Val / 100) % 10).toString() : "",
+      r1Val >= 10 ? (Math.floor(r1Val / 10) % 10).toString() : "",
+      (r1Val % 10).toString()
+    ];
+    
+    const r2 = [
+      r2Val >= 100 ? (Math.floor(r2Val / 100) % 10).toString() : "",
+      r2Val >= 10 ? (Math.floor(r2Val / 10) % 10).toString() : "",
+      (r2Val % 10).toString(),
+      ""
+    ];
+    
+    const res = [
+      resVal >= 1000 ? (Math.floor(resVal / 1000) % 10).toString() : "",
+      resVal >= 100 ? (Math.floor(resVal / 100) % 10).toString() : "",
+      resVal >= 10 ? (Math.floor(resVal / 10) % 10).toString() : "",
+      (resVal % 10).toString()
+    ];
+    
+    return { r1, r2, res };
+  };
+
+  const getSolvingSequence = (prob: MathProblem) => {
+    if (!prob || prob.num1 === undefined || prob.num2 === undefined) return [];
+    
+    const sequence: { row: 'r1' | 'r2' | 'res'; col: number }[] = [];
+    
+    // r1 from right to left (3, 2, 1, 0)
+    for (let c = 3; c >= 0; c--) {
+      sequence.push({ row: 'r1', col: c });
+    }
+    
+    // r2 from right to left (3, 2, 1, 0)
+    for (let c = 3; c >= 0; c--) {
+      sequence.push({ row: 'r2', col: c });
+    }
+    
+    // res from right to left (3, 2, 1, 0)
+    for (let c = 3; c >= 0; c--) {
+      sequence.push({ row: 'res', col: c });
+    }
+    
+    return sequence;
+  };
+
+  const handleCellChange = (row: 'r1' | 'r2' | 'res', colIndex: number, val: string) => {
+    const digit = val.slice(-1);
+    if (digit !== "" && !/^[0-9]$/.test(digit)) return;
+    
+    const newState = { ...colMultState };
+    newState[row][colIndex] = digit;
+    setColMultState(newState);
+
+    if (digit !== "" && problem) {
+      const sequence = getSolvingSequence(problem);
+      const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
+      if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
+        const nextCell = sequence[currentIndex + 1];
+        setTimeout(() => {
+          document.getElementById(`cell-${nextCell.row}-${nextCell.col}`)?.focus();
+        }, 10);
+      }
+    }
+  };
+
+  const handleKeyDown = (row: 'r1' | 'r2' | 'res', colIndex: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && colMultState[row][colIndex] === '' && problem) {
+      const sequence = getSolvingSequence(problem);
+      const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
+      if (currentIndex > 0) {
+        const prevCell = sequence[currentIndex - 1];
+        const nextState = { ...colMultState };
+        nextState[prevCell.row][prevCell.col] = '';
+        setColMultState(nextState);
+        setTimeout(() => {
+          document.getElementById(`cell-${prevCell.row}-${prevCell.col}`)?.focus();
+        }, 10);
+      }
+      return;
+    }
+
+    // Enter or Space moves forward in solving sequence
+    if ((e.key === 'Enter' || e.key === ' ') && problem) {
+      e.preventDefault();
+      const sequence = getSolvingSequence(problem);
+      const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
+      if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
+        const nextCell = sequence[currentIndex + 1];
+        setTimeout(() => {
+          document.getElementById(`cell-${nextCell.row}-${nextCell.col}`)?.focus();
+        }, 10);
+      }
+      return;
+    }
+
+    // Arrow Left moves to left cell (equivalent to forward in solving sequence)
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (colIndex > 0) {
+        document.getElementById(`cell-${row}-${colIndex - 1}`)?.focus();
+      } else {
+        // From col 0, move to next row's col 3
+        const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
+        if (nextRow) {
+          document.getElementById(`cell-${nextRow}-3`)?.focus();
+        }
+      }
+      return;
+    }
+
+    // Arrow Right moves to right cell (backward)
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (colIndex < 3) {
+        document.getElementById(`cell-${row}-${colIndex + 1}`)?.focus();
+      } else {
+        // From col 3, move to previous row's col 0
+        const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
+        if (prevRow) {
+          document.getElementById(`cell-${prevRow}-0`)?.focus();
+        }
+      }
+      return;
+    }
+
+    // Arrow Up moves vertically up
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
+      if (prevRow) {
+        document.getElementById(`cell-${prevRow}-${colIndex}`)?.focus();
+      }
+      return;
+    }
+
+    // Arrow Down moves vertically down
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
+      if (nextRow) {
+        document.getElementById(`cell-${nextRow}-${colIndex}`)?.focus();
+      }
+      return;
+    }
+  };
   
   // 3-კითხვიანი ბლოკის ლოგიკა
   const [questionsInBlock, setQuestionsInBlock] = useState<number>(0); 
@@ -296,7 +482,8 @@ const App: React.FC = () => {
     if (deltaTotal <= 0) return; // ახალი მონაცემი არ არის
     
     const modeName = mode === GameMode.Thomthematica ? 'თომთემატიკა' : 
-                     mode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 'გეთომეტრია';
+                     mode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 
+                     mode === GameMode.Gethometria ? 'გეთომეტრია' : 'ქვეშმიწერით გამრავლება';
     const payload = JSON.stringify({ gameMode: modeName, totalQuestions: deltaTotal, totalCorrect: deltaCorrect });
     
     lastSentStatsRef.current = { total, correct };
@@ -350,9 +537,21 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (gameState === GameState.Playing) {
-      inputRef.current?.focus();
+      if (gameMode === GameMode.Kveshmicera) {
+        setTimeout(() => {
+          if (problem) {
+            const sequence = getSolvingSequence(problem);
+            if (sequence.length > 0) {
+              const firstCell = sequence[0];
+              document.getElementById(`cell-${firstCell.row}-${firstCell.col}`)?.focus();
+            }
+          }
+        }, 120);
+      } else {
+        inputRef.current?.focus();
+      }
     }
-  }, [gameState]);
+  }, [gameState, gameMode, problem]);
 
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -394,71 +593,179 @@ const App: React.FC = () => {
     return selected;
   };
 
+  const isColMultFilled = () => {
+    if (!problem) return false;
+    return colMultState.r1.some(v => v !== '') || 
+           colMultState.r2.some(v => v !== '') || 
+           colMultState.res.some(v => v !== '');
+  };
+
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!problem || !userAnswer) return;
+    if (!problem) return;
+
+    if (gameMode !== GameMode.Kveshmicera && !userAnswer) return;
 
     stopTimer();
 
-    const val = parseInt(userAnswer, 10);
-    if (isNaN(val)) return;
+    let isCorrect = false;
+    let actualUserAnswer = userAnswer;
 
-    const isCorrect = val === problem.answer;
-    
-    // ჯამური სტატისტიკის განახლება
-    setTotalQuestions(prev => prev + 1);
-    if (isCorrect) setTotalCorrect(prev => prev + 1);
+    if (gameMode === GameMode.Kveshmicera) {
+      const { r1: expR1, r2: expR2, res: expRes } = getExpectedDigits(problem.num1!, problem.num2!);
+      let isAllCorrect = true;
+      for (let c = 0; c < 4; c++) {
+        if (colMultState.r1[c] !== expR1[c]) isAllCorrect = false;
+        if (colMultState.r2[c] !== expR2[c]) isAllCorrect = false;
+        if (colMultState.res[c] !== expRes[c]) isAllCorrect = false;
+      }
+      isCorrect = isAllCorrect;
+      // For incorrect display, show the combined result numbers
+      const nonZeroRes = colMultState.res.filter(v => v !== "");
+      actualUserAnswer = nonZeroRes.join('') || "0";
+    } else {
+      const val = parseInt(userAnswer, 10);
+      if (isNaN(val)) return;
+      isCorrect = val === problem.answer;
+    }
 
-    // 40-კითხვიანი ბლოკის განახლება
-    const nextInBlock40 = questionsInBlock40 + 1;
-    const nextCorrectInBlock40 = correctInBlock40 + (isCorrect ? 1 : 0);
-    
-    setQuestionsInBlock40(nextInBlock40);
-    setCorrectInBlock40(nextCorrectInBlock40);
+    if (gameMode === GameMode.Kveshmicera) {
+      if (isCorrect) {
+        // Correct Answer!
+        // Increment statistics only if they haven't failed previously on this specific question
+        if (!hasKveshFailedThisQuestion) {
+          setTotalQuestions(prev => prev + 1);
+          setTotalCorrect(prev => prev + 1);
 
-    if (isCorrect) {
-      const nextQuestionsInBlock = questionsInBlock + 1;
-      setQuestionsInBlock(nextQuestionsInBlock);
+          const nextInBlock40 = questionsInBlock40 + 1;
+          const nextCorrectInBlock40 = correctInBlock40 + 1;
+          setQuestionsInBlock40(nextInBlock40);
+          setCorrectInBlock40(nextCorrectInBlock40);
 
-      let message = getUniqueRandomPhrase(CORRECT_PHRASES);
-
-      if (nextQuestionsInBlock === 3) {
-        setShowRewardImage(true);
-        if (isPerfectBlock) {
-           setConsecutivePerfectBlocks(prev => prev + 1);
-        } else {
-           message = "შეცდომები გქონდა! მეფე უკმაყოფილოა.";
+          // Check for 40 block completion
+          if (nextInBlock40 === 40) {
+            if (nextCorrectInBlock40 >= 39) {
+              setLastCompletedBlockCorrectCount(nextCorrectInBlock40);
+              setTimeout(() => {
+                setShowWishModal(true);
+              }, 1500);
+            }
+            setQuestionsInBlock40(0);
+            setCorrectInBlock40(0);
+          }
         }
+
+        const nextQuestionsInBlock = questionsInBlock + 1;
+        setQuestionsInBlock(nextQuestionsInBlock);
+
+        let message = getUniqueRandomPhrase(CORRECT_PHRASES);
+
+        if (nextQuestionsInBlock === 3) {
+          setShowRewardImage(true);
+          if (isPerfectBlock) {
+             setConsecutivePerfectBlocks(prev => prev + 1);
+          } else {
+             message = "შეცდომები გქონდა! მეფე უკმაყოფილოა.";
+          }
+        } else {
+          setShowRewardImage(false);
+        }
+
+        setCurrentMessage(message);
+        setGameState(GameState.Correct);
+        // Clear validation flags for next question
+        setShowKveshValidation(false);
+        setHasKveshFailedThisQuestion(false);
+
       } else {
+        // Incorrect Answer!
+        // Check if this is their first failure on this question
+        if (!hasKveshFailedThisQuestion) {
+          setTotalQuestions(prev => prev + 1);
+          const nextInBlock40 = questionsInBlock40 + 1;
+          setQuestionsInBlock40(nextInBlock40);
+
+          // Check for 40 block completion
+          if (nextInBlock40 === 40) {
+            // Because they got it wrong, nextCorrectInBlock40 is just current correctInBlock40
+            if (correctInBlock40 >= 39) {
+              setLastCompletedBlockCorrectCount(correctInBlock40);
+              setTimeout(() => {
+                setShowWishModal(true);
+              }, 1500);
+            }
+            setQuestionsInBlock40(0);
+            setCorrectInBlock40(0);
+          }
+
+          setHasKveshFailedThisQuestion(true);
+          setIsPerfectBlock(false);
+          setConsecutivePerfectBlocks(0);
+        }
+
+        const template = getUniqueRandomPhrase(INCORRECT_PHRASES);
+        const finalMessage = template.replace("[]", actualUserAnswer);
+        setCurrentMessage(finalMessage);
+        setShowKveshValidation(true);
+        setShowRewardImage(false);
+      }
+    } else {
+      // General non-Kveshmicera modes logic
+      // ჯამური სტატისტიკის განახლება
+      setTotalQuestions(prev => prev + 1);
+      if (isCorrect) setTotalCorrect(prev => prev + 1);
+
+      // 40-კითხვიანი ბლოკის განახლება
+      const nextInBlock40 = questionsInBlock40 + 1;
+      const nextCorrectInBlock40 = correctInBlock40 + (isCorrect ? 1 : 0);
+      
+      setQuestionsInBlock40(nextInBlock40);
+      setCorrectInBlock40(nextCorrectInBlock40);
+
+      if (isCorrect) {
+        const nextQuestionsInBlock = questionsInBlock + 1;
+        setQuestionsInBlock(nextQuestionsInBlock);
+
+        let message = getUniqueRandomPhrase(CORRECT_PHRASES);
+
+        if (nextQuestionsInBlock === 3) {
+          setShowRewardImage(true);
+          if (isPerfectBlock) {
+             setConsecutivePerfectBlocks(prev => prev + 1);
+          } else {
+             message = "შეცდომები გქონდა! მეფე უკმაყოფილოა.";
+          }
+        } else {
+          setShowRewardImage(false);
+        }
+
+        setCurrentMessage(message);
+        setGameState(GameState.Correct);
+      } else {
+        setIsPerfectBlock(false);
+        setConsecutivePerfectBlocks(0);
+
+        const template = getUniqueRandomPhrase(INCORRECT_PHRASES);
+        const finalMessage = template.replace("[]", actualUserAnswer);
+        
+        setCurrentMessage(finalMessage);
+        setGameState(GameState.Incorrect);
         setShowRewardImage(false);
       }
 
-      setCurrentMessage(message);
-      setGameState(GameState.Correct);
-    } else {
-      setIsPerfectBlock(false);
-      setConsecutivePerfectBlocks(0);
-
-      const template = getUniqueRandomPhrase(INCORRECT_PHRASES);
-      const finalMessage = template.replace("[]", userAnswer);
-      
-      setCurrentMessage(finalMessage);
-      setGameState(GameState.Incorrect);
-      setShowRewardImage(false);
-    }
-
-    // შემოწმება 40 კითხვის შემდეგ
-    if (nextInBlock40 === 40) {
-      if (nextCorrectInBlock40 >= 39) {
-        setLastCompletedBlockCorrectCount(nextCorrectInBlock40);
-        // ვაჩვენებთ სურვილის ფანჯარას მცირე დაყოვნებით, რომ პასუხის შედეგი გამოჩნდეს
-        setTimeout(() => {
-          setShowWishModal(true);
-        }, 1500);
+      // შემოწმება 40 კითხვის შემდეგ
+      if (nextInBlock40 === 40) {
+        if (nextCorrectInBlock40 >= 39) {
+          setLastCompletedBlockCorrectCount(nextCorrectInBlock40);
+          // ვაჩვენებთ სურვილის ფანჯარას მცირე დაყოვნებით, რომ პასუხის შედეგი გამოჩნდეს
+          setTimeout(() => {
+            setShowWishModal(true);
+          }, 1500);
+        }
+        // ვანულებთ ბლოკს შემდეგი 40-ისთვის
+        setQuestionsInBlock40(0);
+        setCorrectInBlock40(0);
       }
-      // ვანულებთ ბლოკს შემდეგი 40-ისთვის
-      setQuestionsInBlock40(0);
-      setCorrectInBlock40(0);
     }
   };
 
@@ -466,6 +773,11 @@ const App: React.FC = () => {
     if (showWishModal && !force) return; // არ გადავიდეს შემდეგზე სანამ სურვილს არ დაწერს
     if (gameState === GameState.Incorrect) {
       setUserAnswer('');
+      setColMultState({
+        r1: ['', '', '', ''],
+        r2: ['', '', '', ''],
+        res: ['', '', '', '']
+      });
       setGameState(GameState.Playing);
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
@@ -477,12 +789,19 @@ const App: React.FC = () => {
       let nextIndex = questionsInBlock;
       if (questionsInBlock >= 3) {
         setQuestionsInBlock(0);
-        setIsPerfectBlock(true);
+         setIsPerfectBlock(true);
         nextIndex = 0;
       }
 
       setProblem(generateProblem(gameMode!, nextIndex));
       setUserAnswer('');
+      setColMultState({
+        r1: ['', '', '', ''],
+        r2: ['', '', '', ''],
+        res: ['', '', '', '']
+      });
+      setShowKveshValidation(false);
+      setHasKveshFailedThisQuestion(false);
       setGameState(GameState.Playing);
       setShowRewardImage(false);
       if (gameMode === GameMode.ThomravlebisTabula) {
@@ -497,7 +816,8 @@ const App: React.FC = () => {
     setIsSendingWish(true);
     // ვაგზავნით შენახულ შედეგს
     const modeName = gameMode === GameMode.Thomthematica ? 'თომთემატიკა' : 
-                     gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 'გეთომეტრია';
+                     gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 
+                     gameMode === GameMode.Gethometria ? 'გეთომეტრია' : 'ქვეშმიწერით გამრავლება';
 
     const payload = JSON.stringify({ 
       gameMode: modeName, 
@@ -562,6 +882,12 @@ const App: React.FC = () => {
             >
               გეთომეტრია 📐
             </Button>
+            <Button 
+              onClick={() => setGameMode(GameMode.Kveshmicera)}
+              className="text-xl py-6 bg-amber-600 hover:bg-amber-700"
+            >
+              ქვეშმიწერით გამრავლება ✍️
+            </Button>
           </div>
         </div>
       </div>
@@ -595,9 +921,10 @@ const App: React.FC = () => {
           >
             🏠
           </button>
-          <h1 className="text-xl md:text-4xl font-black text-indigo-900 tracking-tight">
+          <h1 className="text-xl md:text-3xl lg:text-4xl font-black text-indigo-900 tracking-tight">
             {gameMode === GameMode.Thomthematica ? 'თომთემატიკა 👑' : 
-             gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა ✖️' : 'გეთომეტრია 📐'}
+             gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა ✖️' : 
+             gameMode === GameMode.Gethometria ? 'გეთომეტრია 📐' : 'ქვეშმიწერით გამრავლება ✍️'}
           </h1>
         </div>
         
@@ -624,7 +951,166 @@ const App: React.FC = () => {
         <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400" />
 
         <div className="text-center space-y-8">
-          {problem.category === 'geometry' ? (
+          {gameMode === GameMode.Kveshmicera ? (
+            <div className="w-full flex flex-col items-center justify-center">
+              <p className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">
+                შეავსე ქვეშმიწერით გამრავლება!
+              </p>
+
+              {showKveshValidation && (
+                <div className="w-full max-w-sm mb-4 bg-rose-50 border border-rose-200 text-rose-700 font-bold px-4 py-3 rounded-2xl text-center shadow-sm animate-pulse text-base">
+                  {currentMessage || "ზოგიერთი ციფრი არასწორია! შეასწორე წითელი უჯრები."}
+                </div>
+              )}
+              
+              <div className="inline-grid grid-cols-5 gap-2 md:gap-4 font-mono items-center text-2xl md:text-4xl font-extrabold text-indigo-950 p-6 md:p-8 bg-indigo-50/55 rounded-3xl border border-indigo-100">
+                {/* Row 1: num1 (e.g. 24) */}
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
+                  {Math.floor(problem.num1! / 10)}
+                </div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
+                  {problem.num1! % 10}
+                </div>
+
+                {/* Row 2: num2 (e.g. 66) */}
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-amber-600 font-extrabold text-3xl md:text-5xl">
+                  ×
+                </div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
+                  {Math.floor(problem.num2! / 10)}
+                </div>
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
+                  {problem.num2! % 10}
+                </div>
+
+                {/* Line 1 */}
+                <div className="col-span-5 h-[4px] bg-indigo-900/60 my-1 rounded-full" />
+
+                {/* Row 3: First partial product row (r1) */}
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
+                {(() => {
+                  const { r1 } = getExpectedDigits(problem.num1!, problem.num2!);
+                  return [0, 1, 2, 3].map((idx) => {
+                    const expected = r1[idx];
+                    let cellBgColorClass = "bg-white border-indigo-200 focus:border-amber-400 focus:ring-amber-200 text-indigo-900";
+                    if (showKveshValidation) {
+                      const userVal = colMultState.r1[idx];
+                      if (userVal === expected) {
+                        cellBgColorClass = "bg-emerald-50 border-emerald-500 text-emerald-950 focus:border-emerald-600 focus:ring-emerald-200";
+                      } else {
+                        cellBgColorClass = "bg-rose-50 border-rose-500 text-rose-950 focus:border-rose-600 focus:ring-rose-200";
+                      }
+                    }
+
+                    return (
+                      <input
+                        key={idx}
+                        id={`cell-r1-${idx}`}
+                        type="tel"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={colMultState.r1[idx]}
+                        onChange={(e) => handleCellChange('r1', idx, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown('r1', idx, e)}
+                        className={`w-10 h-10 md:w-14 md:h-14 text-center rounded-2xl border-2 md:border-4 font-mono font-black outline-none transition-all placeholder-indigo-100 placeholder-opacity-50 ${cellBgColorClass}`}
+                        placeholder="?"
+                      />
+                    );
+                  });
+                })()}
+
+                {/* Row 4: Second partial product row (r2) */}
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-amber-600 font-black text-3xl md:text-5xl">
+                  +
+                </div>
+                {(() => {
+                  const { r2 } = getExpectedDigits(problem.num1!, problem.num2!);
+                  return [0, 1, 2, 3].map((idx) => {
+                    const expected = r2[idx];
+                    let cellBgColorClass = "bg-white border-indigo-200 focus:border-amber-400 focus:ring-amber-200 text-indigo-900";
+                    if (showKveshValidation) {
+                      const userVal = colMultState.r2[idx];
+                      if (userVal === expected) {
+                        cellBgColorClass = "bg-emerald-50 border-emerald-500 text-emerald-950 focus:border-emerald-600 focus:ring-emerald-200";
+                      } else {
+                        cellBgColorClass = "bg-rose-50 border-rose-500 text-rose-950 focus:border-rose-600 focus:ring-rose-200";
+                      }
+                    }
+
+                    return (
+                      <input
+                        key={idx}
+                        id={`cell-r2-${idx}`}
+                        type="tel"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={colMultState.r2[idx]}
+                        onChange={(e) => handleCellChange('r2', idx, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown('r2', idx, e)}
+                        className={`w-10 h-10 md:w-14 md:h-14 text-center rounded-2xl border-2 md:border-4 font-mono font-black outline-none transition-all placeholder-indigo-100 placeholder-opacity-50 ${cellBgColorClass}`}
+                        placeholder="?"
+                      />
+                    );
+                  });
+                })()}
+
+                {/* Line 2 */}
+                <div className="col-span-5 h-[4px] bg-indigo-900/60 my-1 rounded-full" />
+
+                {/* Row 5: Final sum row (res) */}
+                <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
+                {(() => {
+                  const { res } = getExpectedDigits(problem.num1!, problem.num2!);
+                  return [0, 1, 2, 3].map((idx) => {
+                    const expected = res[idx];
+                    let cellBgColorClass = "bg-white border-indigo-200 focus:border-amber-400 focus:ring-amber-200 text-indigo-900";
+                    if (showKveshValidation) {
+                      const userVal = colMultState.res[idx];
+                      if (userVal === expected) {
+                        cellBgColorClass = "bg-emerald-50 border-emerald-500 text-emerald-950 focus:border-emerald-600 focus:ring-emerald-200";
+                      } else {
+                        cellBgColorClass = "bg-rose-50 border-rose-500 text-rose-950 focus:border-rose-600 focus:ring-rose-200";
+                      }
+                    }
+
+                    return (
+                      <input
+                        key={idx}
+                        id={`cell-res-${idx}`}
+                        type="tel"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={colMultState.res[idx]}
+                        onChange={(e) => handleCellChange('res', idx, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown('res', idx, e)}
+                        className={`w-10 h-10 md:w-14 md:h-14 text-center rounded-2xl border-2 md:border-4 font-mono font-black outline-none transition-all placeholder-indigo-100 placeholder-opacity-50 ${cellBgColorClass}`}
+                        placeholder="?"
+                      />
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Submit Button Block */}
+              <form onSubmit={handleSubmit} className="w-full mt-8">
+                <Button 
+                  type="submit" 
+                  className="w-full text-2xl py-4 bg-amber-500 hover:bg-amber-600 shadow-lg"
+                  disabled={!isColMultFilled()}
+                >
+                  შემოწმება
+                </Button>
+              </form>
+            </div>
+          ) : problem.category === 'geometry' ? (
             <div className="space-y-6">
               <p className="text-gray-500 font-medium uppercase tracking-wider text-sm md:text-base">
                 {problem.measurement === 'sidesCount' ? 'რამდენი გვერდი აქვს ამ ფიგურას?' : 
@@ -839,4 +1325,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
