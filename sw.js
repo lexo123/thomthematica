@@ -1,9 +1,11 @@
-const CACHE_NAME = 'thomthematica-v1';
+const CACHE_NAME = 'thomthematica-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
-  './king.png'
+  './king.png',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
