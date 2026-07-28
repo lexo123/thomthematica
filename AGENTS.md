@@ -2,9 +2,9 @@
 
 ## User Workflow & Environment
 1. **OS**: Ubuntu (Linux). Never provide Windows, PowerShell, or macOS instructions.
-2. **Local Download / Sync Options**:
-   - **Option A (Git Sync)**: User executes `git pull origin main` in their local cloned repository on Ubuntu.
-   - **Option B (ZIP Download)**: User downloads the project ZIP from AI Studio menu and extracts it on Ubuntu.
+2. **Primary Workflow**:
+   - User downloads the ZIP archive directly from AI Studio (Export / Download ZIP).
+   - User extracts/copies the new project files into their local Git repository folder on Ubuntu.
 3. **gh-pages / GitHub Deployment Rules**:
-   - Always instruct the user to clear the gh-pages cache on Ubuntu before deploying: `rm -rf node_modules/.cache/gh-pages`.
-   - Provide direct, explicit, step-by-step Ubuntu terminal commands without skipping any step.
+   - Before deploying or committing, ALWAYS remove `node_modules/.cache/gh-pages` so Git doesn't treat the cache as a submodule: `rm -rf node_modules/.cache/gh-pages`.
+   - Provide direct, explicit, complete step-by-step Ubuntu terminal commands without skipping any step.
