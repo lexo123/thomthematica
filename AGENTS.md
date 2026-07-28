@@ -6,5 +6,6 @@
    - User downloads the ZIP archive directly from AI Studio (Export / Download ZIP).
    - User extracts/copies the new project files into their local Git repository folder on Ubuntu.
 3. **gh-pages / GitHub Deployment Rules**:
-   - Before deploying or committing, ALWAYS remove `node_modules/.cache/gh-pages` so Git doesn't treat the cache as a submodule: `rm -rf node_modules/.cache/gh-pages`.
+   - Clean local git submodule cache on Ubuntu: `git rm -r --cached node_modules 2>/dev/null; rm -rf node_modules/.cache/gh-pages .git/modules/node_modules`.
+   - Preferred deployment method: GitHub Actions workflow `.github/workflows/deploy.yml` (push to `main` auto-deploys to GitHub Pages).
    - Provide direct, explicit, complete step-by-step Ubuntu terminal commands without skipping any step.
