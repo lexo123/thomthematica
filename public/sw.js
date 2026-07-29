@@ -1,5 +1,5 @@
-const CACHE_NAME = 'thomthematica-v3';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'thomthematica-v5';
+const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
@@ -9,17 +9,19 @@ const ASSETS_TO_CACHE = [
   './icon-512.png'
 ];
 
+// Install: Cache core assets and skip waiting
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return Promise.allSettled(
-        ASSETS_TO_CACHE.map((asset) => cache.add(asset))
+        PRECACHE_ASSETS.map((asset) => cache.add(asset))
       );
     })
   );
 });
 
+// Activate: Claim clients and delete old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -34,35 +36,54 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Fetch: Handles navigation and static assets cleanly
 self.addEventListener('fetch', (event) => {
   const req = event.request;
 
-  // მხოლოდ GET მოთხოვნები და http/https სქემები
   if (req.method !== 'GET' || !req.url.startsWith('http')) {
     return;
   }
 
+  // Handle HTML Page Navigations (Shortcut launch / Page open)
+  if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(req)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cached = await caches.match(req) || await caches.match('./index.html') || await caches.match('./');
+          if (cached) return cached;
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
+        })
+    );
+    return;
+  }
+
+  // Handle static assets (JS, CSS, images, fonts)
   event.respondWith(
-    fetch(req)
-      .then((networkResponse) => {
+    caches.match(req).then((cachedResponse) => {
+      if (cachedResponse) {
+        // Fetch background update for cache
+        fetch(req).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, networkResponse));
+          }
+        }).catch(() => {});
+        return cachedResponse;
+      }
+
+      return fetch(req).then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(req, responseToCache).catch(() => {});
-          });
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
         }
         return networkResponse;
-      })
-      .catch(async () => {
-        const cachedResponse = await caches.match(req);
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
-          const fallback = await caches.match('./index.html') || await caches.match('./');
-          if (fallback) return fallback;
-        }
-        return new Response('Network error', { status: 408, headers: { 'Content-Type': 'text/plain' } });
-      })
+      });
+    })
   );
 });
