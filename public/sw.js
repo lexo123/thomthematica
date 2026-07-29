@@ -1,27 +1,9 @@
-const CACHE_NAME = 'thomthematica-v5';
-const PRECACHE_ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './king.png',
-  './king1.png',
-  './icon-192.png',
-  './icon-512.png'
-];
+const CACHE_NAME = 'thomthematica-v6';
 
-// Install: Cache core assets and skip waiting
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return Promise.allSettled(
-        PRECACHE_ASSETS.map((asset) => cache.add(asset))
-      );
-    })
-  );
 });
 
-// Activate: Claim clients and delete old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -36,7 +18,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Handles navigation and static assets cleanly
 self.addEventListener('fetch', (event) => {
   const req = event.request;
 
@@ -44,46 +25,41 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle HTML Page Navigations (Shortcut launch / Page open)
-  if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
+  // Network-first for navigation (opening app/shortcut)
+  if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const copy = networkResponse.clone();
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
           }
-          return networkResponse;
+          return response;
         })
         .catch(async () => {
-          const cached = await caches.match(req) || await caches.match('./index.html') || await caches.match('./');
-          if (cached) return cached;
-          return new Response('Offline', { status: 503, statusText: 'Offline' });
+          const cache = await caches.open(CACHE_NAME);
+          const cachedResponse = await cache.match(req) || await cache.match('./index.html') || await cache.match('./');
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return new Response('Offline', { status: 200, headers: { 'Content-Type': 'text/html' } });
         })
     );
     return;
   }
 
-  // Handle static assets (JS, CSS, images, fonts)
+  // Stale-while-revalidate for other assets
   event.respondWith(
     caches.match(req).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch background update for cache
-        fetch(req).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, networkResponse));
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-
-      return fetch(req).then((networkResponse) => {
+      const fetchPromise = fetch(req).then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const copy = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
         }
         return networkResponse;
-      });
+      }).catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
     })
   );
 });
