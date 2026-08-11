@@ -335,8 +335,15 @@ const App: React.FC = () => {
   };
 
   const handleCellChange = (row: 'r1' | 'r2' | 'res', colIndex: number, val: string) => {
+    if (val === '') {
+      const newState = { ...colMultState };
+      newState[row][colIndex] = '';
+      setColMultState(newState);
+      return;
+    }
+
     const digit = val.slice(-1);
-    if (digit !== "" && !/^[0-9]$/.test(digit)) return;
+    if (!/^[0-9]$/.test(digit)) return;
     
     const newState = { ...colMultState };
     newState[row][colIndex] = digit;
@@ -348,24 +355,45 @@ const App: React.FC = () => {
       if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
         const nextCell = sequence[currentIndex + 1];
         setTimeout(() => {
-          document.getElementById(`cell-${nextCell.row}-${nextCell.col}`)?.focus();
+          const el = document.getElementById(`cell-${nextCell.row}-${nextCell.col}`) as HTMLInputElement;
+          if (el) {
+            el.focus();
+            el.select();
+          }
         }, 10);
       }
     }
   };
 
   const handleKeyDown = (row: 'r1' | 'r2' | 'res', colIndex: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && colMultState[row][colIndex] === '' && problem) {
-      const sequence = getSolvingSequence(problem);
-      const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
-      if (currentIndex > 0) {
-        const prevCell = sequence[currentIndex - 1];
-        const nextState = { ...colMultState };
-        nextState[prevCell.row][prevCell.col] = '';
-        setColMultState(nextState);
-        setTimeout(() => {
-          document.getElementById(`cell-${prevCell.row}-${prevCell.col}`)?.focus();
-        }, 10);
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      
+      // If cell is not empty, clear current cell regardless of cursor position
+      if (colMultState[row][colIndex] !== '') {
+        const newState = { ...colMultState };
+        newState[row][colIndex] = '';
+        setColMultState(newState);
+        return;
+      }
+
+      // If cell is already empty, move to previous cell in solving sequence and clear it
+      if (problem) {
+        const sequence = getSolvingSequence(problem);
+        const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
+        if (currentIndex > 0) {
+          const prevCell = sequence[currentIndex - 1];
+          const nextState = { ...colMultState };
+          nextState[prevCell.row][prevCell.col] = '';
+          setColMultState(nextState);
+          setTimeout(() => {
+            const el = document.getElementById(`cell-${prevCell.row}-${prevCell.col}`) as HTMLInputElement;
+            if (el) {
+              el.focus();
+              el.select();
+            }
+          }, 10);
+        }
       }
       return;
     }
@@ -378,7 +406,11 @@ const App: React.FC = () => {
       if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
         const nextCell = sequence[currentIndex + 1];
         setTimeout(() => {
-          document.getElementById(`cell-${nextCell.row}-${nextCell.col}`)?.focus();
+          const el = document.getElementById(`cell-${nextCell.row}-${nextCell.col}`) as HTMLInputElement;
+          if (el) {
+            el.focus();
+            el.select();
+          }
         }, 10);
       }
       return;
@@ -388,12 +420,13 @@ const App: React.FC = () => {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       if (colIndex > 0) {
-        document.getElementById(`cell-${row}-${colIndex - 1}`)?.focus();
+        const el = document.getElementById(`cell-${row}-${colIndex - 1}`) as HTMLInputElement;
+        if (el) { el.focus(); el.select(); }
       } else {
-        // From col 0, move to next row's col 3
         const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
         if (nextRow) {
-          document.getElementById(`cell-${nextRow}-3`)?.focus();
+          const el = document.getElementById(`cell-${nextRow}-3`) as HTMLInputElement;
+          if (el) { el.focus(); el.select(); }
         }
       }
       return;
@@ -403,12 +436,13 @@ const App: React.FC = () => {
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       if (colIndex < 3) {
-        document.getElementById(`cell-${row}-${colIndex + 1}`)?.focus();
+        const el = document.getElementById(`cell-${row}-${colIndex + 1}`) as HTMLInputElement;
+        if (el) { el.focus(); el.select(); }
       } else {
-        // From col 3, move to previous row's col 0
         const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
         if (prevRow) {
-          document.getElementById(`cell-${prevRow}-0`)?.focus();
+          const el = document.getElementById(`cell-${prevRow}-0`) as HTMLInputElement;
+          if (el) { el.focus(); el.select(); }
         }
       }
       return;
@@ -419,7 +453,8 @@ const App: React.FC = () => {
       e.preventDefault();
       const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
       if (prevRow) {
-        document.getElementById(`cell-${prevRow}-${colIndex}`)?.focus();
+        const el = document.getElementById(`cell-${prevRow}-${colIndex}`) as HTMLInputElement;
+        if (el) { el.focus(); el.select(); }
       }
       return;
     }
@@ -429,7 +464,8 @@ const App: React.FC = () => {
       e.preventDefault();
       const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
       if (nextRow) {
-        document.getElementById(`cell-${nextRow}-${colIndex}`)?.focus();
+        const el = document.getElementById(`cell-${nextRow}-${colIndex}`) as HTMLInputElement;
+        if (el) { el.focus(); el.select(); }
       }
       return;
     }
@@ -897,10 +933,10 @@ const App: React.FC = () => {
   if (!problem) return <div className="min-h-screen flex items-center justify-center">იტვირთება...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-indigo-100 to-purple-200 flex flex-col items-center p-2 sm:p-4 relative overflow-x-hidden">
       
-      <header className="absolute top-0 w-full p-4 md:p-6 text-center flex flex-col md:flex-row justify-between px-4 md:px-10 items-center gap-4">
-        <div className="flex items-center gap-4 order-1">
+      <header className="sticky top-0 z-40 w-full max-w-2xl p-2.5 sm:p-4 text-center flex flex-row justify-between px-3 sm:px-6 items-center gap-2 bg-indigo-100/95 backdrop-blur-md border-b border-indigo-200/80 shadow-md rounded-2xl mb-2 sm:mb-4">
+        <div className="flex items-center gap-2 sm:gap-3 order-1 shrink min-w-0">
           <button 
             onClick={() => {
               if (gameMode && totalQuestions > 0) {
@@ -916,12 +952,12 @@ const App: React.FC = () => {
               lastSentStatsRef.current = { total: 0, correct: 0 }; // ვანულებთ შემდეგი თამაშისთვის
               stopTimer();
             }}
-            className="bg-white/60 p-2 rounded-xl hover:bg-white/80 transition-colors border border-indigo-100 text-indigo-900"
+            className="bg-white/80 p-2 rounded-xl hover:bg-white transition-colors border border-indigo-100 text-indigo-900 shadow-sm text-base sm:text-lg flex items-center justify-center shrink-0"
             title="მთავარი მენიუ"
           >
             🏠
           </button>
-          <h1 className="text-xl md:text-3xl lg:text-4xl font-black text-indigo-900 tracking-tight">
+          <h1 className="text-xs sm:text-lg md:text-2xl font-black text-indigo-900 tracking-tight truncate">
             {gameMode === GameMode.Thomthematica ? 'თომთემატიკა 👑' : 
              gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა ✖️' : 
              gameMode === GameMode.Gethometria ? 'გეთომეტრია 📐' : 'ქვეშმიწერით გამრავლება ✍️'}
@@ -929,25 +965,25 @@ const App: React.FC = () => {
         </div>
         
         {/* ქულების პანელი */}
-        <div className="flex gap-2 order-2 md:order-3">
+        <div className="flex gap-1 sm:gap-2 order-2 shrink-0">
           {gameMode === GameMode.ThomravlebisTabula && gameState === GameState.Playing && (
-            <div className={`text-white font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-xl shadow-sm text-sm md:text-base flex flex-col items-center min-w-[80px] transition-colors ${timeLeft <= 3 ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`}>
-              <span className="text-[10px] uppercase opacity-80">დრო</span>
-              <span className="font-black">{timeLeft}წმ</span>
+            <div className={`text-white font-bold px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl shadow-sm text-xs sm:text-sm flex flex-col items-center min-w-[50px] sm:min-w-[70px] transition-colors ${timeLeft <= 3 ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`}>
+              <span className="text-[9px] sm:text-[10px] uppercase opacity-90">დრო</span>
+              <span className="font-black text-xs sm:text-sm">{timeLeft}წმ</span>
             </div>
           )}
-          <div className="text-indigo-800 font-bold bg-white/60 px-3 py-1.5 md:px-4 md:py-2 rounded-xl shadow-sm text-sm md:text-base border border-indigo-100 flex flex-col items-center min-w-[80px]">
-            <span className="text-[10px] uppercase opacity-60">ბლოკი</span>
-            <span className="text-indigo-600 font-black">{questionsInBlock}/3</span>
+          <div className="text-indigo-800 font-bold bg-white/80 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl shadow-sm text-xs sm:text-sm border border-indigo-100 flex flex-col items-center min-w-[55px] sm:min-w-[75px]">
+            <span className="text-[9px] sm:text-[10px] uppercase opacity-60">ბლოკი</span>
+            <span className="text-indigo-600 font-black text-xs sm:text-sm">{questionsInBlock}/3</span>
           </div>
-          <div className="text-green-800 font-bold bg-white/60 px-3 py-1.5 md:px-4 md:py-2 rounded-xl shadow-sm text-sm md:text-base border border-green-100 flex flex-col items-center min-w-[100px]">
-            <span className="text-[10px] uppercase opacity-60">ჯამური ქულა</span>
-            <span className="text-green-600 font-black">{totalCorrect}/{totalQuestions}</span>
+          <div className="text-green-800 font-bold bg-white/80 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl shadow-sm text-xs sm:text-sm border border-green-100 flex flex-col items-center min-w-[75px] sm:min-w-[95px]">
+            <span className="text-[9px] sm:text-[10px] uppercase opacity-60">ჯამური ქულა</span>
+            <span className="text-green-600 font-black text-xs sm:text-sm">{totalCorrect}/{totalQuestions}</span>
           </div>
         </div>
       </header>
 
-      <main className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8 md:p-12 relative overflow-hidden border-b-8 border-indigo-200 mt-20 md:mt-0">
+      <main className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 md:p-12 relative overflow-hidden border-b-8 border-indigo-200 my-auto">
         <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400" />
 
         <div className="text-center space-y-8">
@@ -1018,6 +1054,7 @@ const App: React.FC = () => {
                         value={colMultState.r1[idx]}
                         onChange={(e) => handleCellChange('r1', idx, e.target.value)}
                         onKeyDown={(e) => handleKeyDown('r1', idx, e)}
+                        onFocus={(e) => e.target.select()}
                         className={`w-10 h-10 md:w-14 md:h-14 text-center rounded-2xl border-2 md:border-4 font-mono font-black outline-none transition-all placeholder-indigo-100 placeholder-opacity-50 ${cellBgColorClass}`}
                         placeholder="?"
                       />
@@ -1054,6 +1091,7 @@ const App: React.FC = () => {
                         value={colMultState.r2[idx]}
                         onChange={(e) => handleCellChange('r2', idx, e.target.value)}
                         onKeyDown={(e) => handleKeyDown('r2', idx, e)}
+                        onFocus={(e) => e.target.select()}
                         className={`w-10 h-10 md:w-14 md:h-14 text-center rounded-2xl border-2 md:border-4 font-mono font-black outline-none transition-all placeholder-indigo-100 placeholder-opacity-50 ${cellBgColorClass}`}
                         placeholder="?"
                       />
@@ -1091,6 +1129,7 @@ const App: React.FC = () => {
                         value={colMultState.res[idx]}
                         onChange={(e) => handleCellChange('res', idx, e.target.value)}
                         onKeyDown={(e) => handleKeyDown('res', idx, e)}
+                        onFocus={(e) => e.target.select()}
                         className={`w-10 h-10 md:w-14 md:h-14 text-center rounded-2xl border-2 md:border-4 font-mono font-black outline-none transition-all placeholder-indigo-100 placeholder-opacity-50 ${cellBgColorClass}`}
                         placeholder="?"
                       />
@@ -1259,6 +1298,7 @@ const App: React.FC = () => {
                 inputMode="numeric"
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="?"
                 className="w-full text-center text-5xl font-bold py-4 border-4 border-gray-200 rounded-2xl focus:border-purple-500 focus:ring-4 focus:ring-purple-200 outline-none transition-all placeholder-gray-300 text-gray-800"
               />
