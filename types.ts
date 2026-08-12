@@ -45,3 +45,12 @@ export enum GameState {
   Correct,
   Incorrect
 }
+
+export type TextPos = { x: string; y: string; anchor?: "start" | "middle" | "end" };
+export type ShapeVariant = { points: string; texts: TextPos[] };
+
+export type ColMultState = {
+  r1: string[];
+  r2: string[];
+  res: string[];
+};
