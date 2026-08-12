@@ -161,17 +161,19 @@ export const useGameSession = (gameMode: GameMode | null) => {
 
   const recordAnswer = useCallback((isCorrect: boolean): { isBlock40Completed: boolean } => {
     const isBlock40Completed = state.questionsInBlock40 + 1 === 40;
+    const currentBlockCorrectCount = state.correctInBlock40 + (isCorrect ? 1 : 0);
 
     dispatch({ type: 'RECORD_ANSWER', isCorrect });
 
-    if (isBlock40Completed) {
+    // Show wish modal ONLY if 39 or 40 questions were correct in the completed 40-question block
+    if (isBlock40Completed && currentBlockCorrectCount >= 39) {
       setTimeout(() => {
         dispatch({ type: 'SET_SHOW_WISH_MODAL', show: true });
       }, WISH_MODAL_DELAY_MS);
     }
 
     return { isBlock40Completed };
-  }, [state.questionsInBlock40]);
+  }, [state.questionsInBlock40, state.correctInBlock40]);
 
   const handleWishSubmit = useCallback(async (): Promise<boolean> => {
     if (!state.wishText.trim()) return false;
