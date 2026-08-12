@@ -12,6 +12,7 @@ interface ColumnMultiplicationProps {
   getExpectedDigits: (num1: number, num2: number) => { r1: string[]; r2: string[]; res: string[] };
   onSubmit: (e?: React.FormEvent) => void;
   isColMultFilled: () => boolean;
+  registerCellRef?: (row: string, colIndex: number, el: HTMLInputElement | null) => void;
 }
 
 export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
@@ -24,7 +25,12 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
   getExpectedDigits,
   onSubmit,
   isColMultFilled,
+  registerCellRef,
 }) => {
+  if (!('num1' in problem) || problem.num1 === undefined || problem.num2 === undefined) {
+    return null;
+  }
+
   return (
     <div className="w-full flex flex-col items-center justify-center">
       <p className="text-gray-500 font-medium uppercase tracking-wider text-sm mb-2">
@@ -43,10 +49,10 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
-          {Math.floor(problem.num1! / 10)}
+          {Math.floor(problem.num1 / 10)}
         </div>
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
-          {problem.num1! % 10}
+          {problem.num1 % 10}
         </div>
 
         {/* Row 2: num2 (e.g. 66) */}
@@ -56,10 +62,10 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
-          {Math.floor(problem.num2! / 10)}
+          {Math.floor(problem.num2 / 10)}
         </div>
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-indigo-800 font-black">
-          {problem.num2! % 10}
+          {problem.num2 % 10}
         </div>
 
         {/* Line 1 */}
@@ -68,7 +74,7 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
         {/* Row 3: First partial product row (r1) */}
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
         {(() => {
-          const { r1 } = getExpectedDigits(problem.num1!, problem.num2!);
+          const { r1 } = getExpectedDigits(problem.num1, problem.num2);
           return [0, 1, 2, 3].map((idx) => {
             const expected = r1[idx];
             let cellBgColorClass = "bg-white border-indigo-200 focus:border-amber-400 focus:ring-amber-200 text-indigo-900";
@@ -84,6 +90,7 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
             return (
               <input
                 key={idx}
+                ref={(el) => registerCellRef?.('r1', idx, el)}
                 id={`cell-r1-${idx}`}
                 type="tel"
                 pattern="[0-9]*"
@@ -105,7 +112,7 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
           +
         </div>
         {(() => {
-          const { r2 } = getExpectedDigits(problem.num1!, problem.num2!);
+          const { r2 } = getExpectedDigits(problem.num1, problem.num2);
           return [0, 1, 2, 3].map((idx) => {
             const expected = r2[idx];
             let cellBgColorClass = "bg-white border-indigo-200 focus:border-amber-400 focus:ring-amber-200 text-indigo-900";
@@ -121,6 +128,7 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
             return (
               <input
                 key={idx}
+                ref={(el) => registerCellRef?.('r2', idx, el)}
                 id={`cell-r2-${idx}`}
                 type="tel"
                 pattern="[0-9]*"
@@ -143,7 +151,7 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
         {/* Row 5: Final sum row (res) */}
         <div className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"></div>
         {(() => {
-          const { res } = getExpectedDigits(problem.num1!, problem.num2!);
+          const { res } = getExpectedDigits(problem.num1, problem.num2);
           return [0, 1, 2, 3].map((idx) => {
             const expected = res[idx];
             let cellBgColorClass = "bg-white border-indigo-200 focus:border-amber-400 focus:ring-amber-200 text-indigo-900";
@@ -159,6 +167,7 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
             return (
               <input
                 key={idx}
+                ref={(el) => registerCellRef?.('res', idx, el)}
                 id={`cell-res-${idx}`}
                 type="tel"
                 pattern="[0-9]*"
@@ -180,10 +189,12 @@ export const ColumnMultiplication: React.FC<ColumnMultiplicationProps> = ({
       <form onSubmit={onSubmit} className="w-full mt-8">
         <Button 
           type="submit" 
-          className="w-full text-2xl py-4 bg-amber-500 hover:bg-amber-600 shadow-lg"
+          variant="primary" 
+          size="lg" 
+          fullWidth
           disabled={!isColMultFilled()}
         >
-          შემოწმება
+          შემოწმება 🚀
         </Button>
       </form>
     </div>

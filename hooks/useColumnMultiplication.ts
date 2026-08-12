@@ -1,6 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { ColMultState, MathProblem } from '../types';
 import { getSolvingSequence } from '../utils/columnMultiplication';
+
+/** 
+ * Delay (ms) before auto-focusing the next input cell after digit entry,
+ * backspace, or navigation key press. Gives React time to commit state changes.
+ */
+export const CELL_FOCUS_DELAY_MS = 10;
 
 export const INITIAL_COL_MULT_STATE: ColMultState = {
   r1: ['', '', '', ''],
@@ -12,6 +18,27 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
   const [colMultState, setColMultState] = useState<ColMultState>(INITIAL_COL_MULT_STATE);
   const [showKveshValidation, setShowKveshValidation] = useState<boolean>(false);
   const [hasKveshFailedThisQuestion, setHasKveshFailedThisQuestion] = useState<boolean>(false);
+
+  // React Ref Map for idiomatic input cell focus management without DOM getElementById
+  const cellRefsMap = useRef<Map<string, HTMLInputElement>>(new Map());
+
+  const registerCellRef = useCallback((row: string, colIndex: number, el: HTMLInputElement | null) => {
+    const key = `${row}-${colIndex}`;
+    if (el) {
+      cellRefsMap.current.set(key, el);
+    } else {
+      cellRefsMap.current.delete(key);
+    }
+  }, []);
+
+  const focusCell = useCallback((row: string, colIndex: number) => {
+    const key = `${row}-${colIndex}`;
+    const el = cellRefsMap.current.get(key);
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, []);
 
   const resetColMultState = useCallback(() => {
     setColMultState({
@@ -53,15 +80,11 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
       if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
         const nextCell = sequence[currentIndex + 1];
         setTimeout(() => {
-          const el = document.getElementById(`cell-${nextCell.row}-${nextCell.col}`) as HTMLInputElement;
-          if (el) {
-            el.focus();
-            el.select();
-          }
-        }, 10);
+          focusCell(nextCell.row, nextCell.col);
+        }, CELL_FOCUS_DELAY_MS);
       }
     }
-  }, [problem]);
+  }, [problem, focusCell]);
 
   const handleKeyDown = useCallback((row: 'r1' | 'r2' | 'res', colIndex: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace') {
@@ -85,12 +108,8 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
             [prevCell.row]: prev[prevCell.row].map((c, idx) => idx === prevCell.col ? '' : c)
           }));
           setTimeout(() => {
-            const el = document.getElementById(`cell-${prevCell.row}-${prevCell.col}`) as HTMLInputElement;
-            if (el) {
-              el.focus();
-              el.select();
-            }
-          }, 10);
+            focusCell(prevCell.row, prevCell.col);
+          }, CELL_FOCUS_DELAY_MS);
         }
       }
       return;
@@ -103,12 +122,8 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
       if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
         const nextCell = sequence[currentIndex + 1];
         setTimeout(() => {
-          const el = document.getElementById(`cell-${nextCell.row}-${nextCell.col}`) as HTMLInputElement;
-          if (el) {
-            el.focus();
-            el.select();
-          }
-        }, 10);
+          focusCell(nextCell.row, nextCell.col);
+        }, CELL_FOCUS_DELAY_MS);
       }
       return;
     }
@@ -116,13 +131,11 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       if (colIndex > 0) {
-        const el = document.getElementById(`cell-${row}-${colIndex - 1}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
+        focusCell(row, colIndex - 1);
       } else {
         const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
         if (nextRow) {
-          const el = document.getElementById(`cell-${nextRow}-3`) as HTMLInputElement;
-          if (el) { el.focus(); el.select(); }
+          focusCell(nextRow, 3);
         }
       }
       return;
@@ -131,13 +144,11 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       if (colIndex < 3) {
-        const el = document.getElementById(`cell-${row}-${colIndex + 1}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
+        focusCell(row, colIndex + 1);
       } else {
         const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
         if (prevRow) {
-          const el = document.getElementById(`cell-${prevRow}-0`) as HTMLInputElement;
-          if (el) { el.focus(); el.select(); }
+          focusCell(prevRow, 0);
         }
       }
       return;
@@ -147,8 +158,7 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
       e.preventDefault();
       const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
       if (prevRow) {
-        const el = document.getElementById(`cell-${prevRow}-${colIndex}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
+        focusCell(prevRow, colIndex);
       }
       return;
     }
@@ -157,12 +167,11 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
       e.preventDefault();
       const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
       if (nextRow) {
-        const el = document.getElementById(`cell-${nextRow}-${colIndex}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
+        focusCell(nextRow, colIndex);
       }
       return;
     }
-  }, [problem, colMultState]);
+  }, [problem, colMultState, focusCell]);
 
   return {
     colMultState,
@@ -174,6 +183,7 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
     handleCellChange,
     handleKeyDown,
     isColMultFilled,
-    resetColMultState
+    resetColMultState,
+    registerCellRef
   };
 };

@@ -1,6 +1,7 @@
 import { GameMode } from '../types';
 
-export const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyh3gS70bV2SOdC-wNqUYtkhh4pw8wgeE3ywnJvbGZEuv83x-X9urjVX24O8l3MsZB62w/exec";
+export const DEFAULT_GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbyh3gS70bV2SOdC-wNqUYtkhh4pw8wgeE3ywnJvbGZEuv83x-X9urjVX24O8l3MsZB62w/exec";
+export const GOOGLE_SHEETS_URL = import.meta.env.VITE_GOOGLE_SHEETS_URL || DEFAULT_GOOGLE_SHEETS_URL;
 
 export interface GameStatsPayload {
   gameMode: string;

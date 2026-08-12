@@ -19,54 +19,51 @@ import { useTimer } from './hooks/useTimer';
 import { useColumnMultiplication } from './hooks/useColumnMultiplication';
 import { useGameSession } from './hooks/useGameSession';
 
+/** Delay (ms) to allow DOM rendering before focusing the first cell in Kveshmicera mode */
+const KVESH_FIRST_CELL_FOCUS_DELAY_MS = 120;
+
 const App: React.FC = () => {
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [problem, setProblem] = useState<MathProblem | null>(null);
   const [userAnswer, setUserAnswer] = useState<string>('');
   const [gameState, setGameState] = useState<GameState>(GameState.Playing);
 
+  // Local UI-only state for 3-question blocks and reward popups
+  const [questionsInBlock, setQuestionsInBlock] = useState<number>(0);
+  const [isPerfectBlock, setIsPerfectBlock] = useState<boolean>(true);
+  const [consecutivePerfectBlocks, setConsecutivePerfectBlocks] = useState<number>(0);
+  const [currentMessage, setCurrentMessage] = useState<string>('');
+  const [showRewardImage, setShowRewardImage] = useState<boolean>(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   const {
-    questionsInBlock,
-    setQuestionsInBlock,
-    isPerfectBlock,
-    setIsPerfectBlock,
-    setTotalQuestions,
     totalQuestions,
     totalCorrect,
-    setTotalCorrect,
-    questionsInBlock40,
-    setQuestionsInBlock40,
     correctInBlock40,
-    setCorrectInBlock40,
-    lastCompletedBlockCorrectCount,
-    setLastCompletedBlockCorrectCount,
     showWishModal,
-    setShowWishModal,
     wishText,
+    wishSubmitting,
+    recordAnswer,
+    handleWishSubmit,
+    closeWishModal,
     setWishText,
-    isSendingWish,
-    consecutivePerfectBlocks,
-    setConsecutivePerfectBlocks,
-    currentMessage,
-    setCurrentMessage,
-    showRewardImage,
-    setShowRewardImage,
-    getUniqueRandomPhrase,
     resetSession,
-    submitWish
-  } = useGameSession(gameMode);
+  } = useGameSession(gameMode || GameMode.Thomthematica);
+
+  const getUniqueRandomPhrase = useCallback((phrases: string[]) => {
+    return phrases[Math.floor(Math.random() * phrases.length)];
+  }, []);
 
   const handleTimeOut = useCallback(() => {
     setIsPerfectBlock(false);
     setConsecutivePerfectBlocks(0);
-    setTotalQuestions(prev => prev + 1);
+    recordAnswer(false);
     
     setCurrentMessage("დრო ამოიწურა! წააგე.");
     setGameState(GameState.Incorrect);
     setShowRewardImage(false);
-  }, [setIsPerfectBlock, setConsecutivePerfectBlocks, setTotalQuestions, setCurrentMessage, setShowRewardImage]);
+  }, [recordAnswer]);
 
   const { timeLeft, startTimer, stopTimer } = useTimer({
     timeLimit: TIME_LIMIT,
@@ -82,7 +79,8 @@ const App: React.FC = () => {
     handleCellChange,
     handleKeyDown,
     isColMultFilled,
-    resetColMultState
+    resetColMultState,
+    registerCellRef,
   } = useColumnMultiplication(problem);
 
   useEffect(() => {
@@ -102,15 +100,66 @@ const App: React.FC = () => {
             const sequence = getSolvingSequence(problem);
             if (sequence.length > 0) {
               const firstCell = sequence[0];
-              document.getElementById(`cell-${firstCell.row}-${firstCell.col}`)?.focus();
+              const key = `${firstCell.row}-${firstCell.col}`;
+              const el = document.getElementById(`cell-${key}`) as HTMLInputElement;
+              if (el) { el.focus(); el.select(); }
             }
           }
-        }, 120);
+        }, KVESH_FIRST_CELL_FOCUS_DELAY_MS);
       } else {
         inputRef.current?.focus();
       }
     }
   }, [gameState, gameMode, problem]);
+
+  const processAnswerResult = (isCorrect: boolean, actualUserAnswer: string) => {
+    const shouldRecord = gameMode !== GameMode.Kveshmicera || !hasKveshFailedThisQuestion;
+
+    if (shouldRecord) {
+      recordAnswer(isCorrect);
+    }
+
+    if (gameMode === GameMode.Kveshmicera) {
+      if (isCorrect) {
+        setShowKveshValidation(false);
+        setHasKveshFailedThisQuestion(false);
+      } else {
+        setHasKveshFailedThisQuestion(true);
+        setShowKveshValidation(true);
+      }
+    }
+
+    if (isCorrect) {
+      const nextQuestionsInBlock = questionsInBlock + 1;
+      setQuestionsInBlock(nextQuestionsInBlock);
+
+      let message = getUniqueRandomPhrase(CORRECT_PHRASES);
+
+      if (nextQuestionsInBlock === 3) {
+        setShowRewardImage(true);
+        if (isPerfectBlock) {
+          setConsecutivePerfectBlocks(prev => prev + 1);
+        } else {
+          message = "შეცდომები გქონდა! მეფე უკმაყოფილოა.";
+        }
+      } else {
+        setShowRewardImage(false);
+      }
+
+      setCurrentMessage(message);
+      setGameState(GameState.Correct);
+    } else {
+      setIsPerfectBlock(false);
+      setConsecutivePerfectBlocks(0);
+
+      const template = getUniqueRandomPhrase(INCORRECT_PHRASES);
+      const finalMessage = template.replace("[]", actualUserAnswer);
+      
+      setCurrentMessage(finalMessage);
+      setGameState(GameState.Incorrect);
+      setShowRewardImage(false);
+    }
+  };
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -124,7 +173,7 @@ const App: React.FC = () => {
     let actualUserAnswer = userAnswer;
 
     if (gameMode === GameMode.Kveshmicera) {
-      if (!('num1' in problem && 'num2' in problem)) return;
+      if (!('num1' in problem && 'num2' in problem) || problem.num1 === undefined || problem.num2 === undefined) return;
       const { r1: expR1, r2: expR2, res: expRes } = getExpectedDigits(problem.num1, problem.num2);
       let isAllCorrect = true;
       for (let c = 0; c < 4; c++) {
@@ -141,130 +190,7 @@ const App: React.FC = () => {
       isCorrect = val === problem.answer;
     }
 
-    if (gameMode === GameMode.Kveshmicera) {
-      if (isCorrect) {
-        if (!hasKveshFailedThisQuestion) {
-          setTotalQuestions(prev => prev + 1);
-          setTotalCorrect(prev => prev + 1);
-
-          const nextInBlock40 = questionsInBlock40 + 1;
-          const nextCorrectInBlock40 = correctInBlock40 + 1;
-          setQuestionsInBlock40(nextInBlock40);
-          setCorrectInBlock40(nextCorrectInBlock40);
-
-          if (nextInBlock40 === 40) {
-            if (nextCorrectInBlock40 >= 39) {
-              setLastCompletedBlockCorrectCount(nextCorrectInBlock40);
-              setTimeout(() => {
-                setShowWishModal(true);
-              }, 1500);
-            }
-            setQuestionsInBlock40(0);
-            setCorrectInBlock40(0);
-          }
-        }
-
-        const nextQuestionsInBlock = questionsInBlock + 1;
-        setQuestionsInBlock(nextQuestionsInBlock);
-
-        let message = getUniqueRandomPhrase(CORRECT_PHRASES);
-
-        if (nextQuestionsInBlock === 3) {
-          setShowRewardImage(true);
-          if (isPerfectBlock) {
-             setConsecutivePerfectBlocks(prev => prev + 1);
-          } else {
-             message = "შეცდომები გქონდა! მეფე უკმაყოფილოა.";
-          }
-        } else {
-          setShowRewardImage(false);
-        }
-
-        setCurrentMessage(message);
-        setGameState(GameState.Correct);
-        setShowKveshValidation(false);
-        setHasKveshFailedThisQuestion(false);
-
-      } else {
-        if (!hasKveshFailedThisQuestion) {
-          setTotalQuestions(prev => prev + 1);
-          const nextInBlock40 = questionsInBlock40 + 1;
-          setQuestionsInBlock40(nextInBlock40);
-
-          if (nextInBlock40 === 40) {
-            if (correctInBlock40 >= 39) {
-              setLastCompletedBlockCorrectCount(correctInBlock40);
-              setTimeout(() => {
-                setShowWishModal(true);
-              }, 1500);
-            }
-            setQuestionsInBlock40(0);
-            setCorrectInBlock40(0);
-          }
-
-          setHasKveshFailedThisQuestion(true);
-          setIsPerfectBlock(false);
-          setConsecutivePerfectBlocks(0);
-        }
-
-        const template = getUniqueRandomPhrase(INCORRECT_PHRASES);
-        const finalMessage = template.replace("[]", actualUserAnswer);
-        setCurrentMessage(finalMessage);
-        setShowKveshValidation(true);
-        setShowRewardImage(false);
-      }
-    } else {
-      setTotalQuestions(prev => prev + 1);
-      if (isCorrect) setTotalCorrect(prev => prev + 1);
-
-      const nextInBlock40 = questionsInBlock40 + 1;
-      const nextCorrectInBlock40 = correctInBlock40 + (isCorrect ? 1 : 0);
-      
-      setQuestionsInBlock40(nextInBlock40);
-      setCorrectInBlock40(nextCorrectInBlock40);
-
-      if (isCorrect) {
-        const nextQuestionsInBlock = questionsInBlock + 1;
-        setQuestionsInBlock(nextQuestionsInBlock);
-
-        let message = getUniqueRandomPhrase(CORRECT_PHRASES);
-
-        if (nextQuestionsInBlock === 3) {
-          setShowRewardImage(true);
-          if (isPerfectBlock) {
-             setConsecutivePerfectBlocks(prev => prev + 1);
-          } else {
-             message = "შეცდომები გქონდა! მეფე უკმაყოფილოა.";
-          }
-        } else {
-          setShowRewardImage(false);
-        }
-
-        setCurrentMessage(message);
-        setGameState(GameState.Correct);
-      } else {
-        setIsPerfectBlock(false);
-        setConsecutivePerfectBlocks(0);
-
-        const template = getUniqueRandomPhrase(INCORRECT_PHRASES);
-        const finalMessage = template.replace("[]", actualUserAnswer);
-        
-        setCurrentMessage(finalMessage);
-        setGameState(GameState.Incorrect);
-        setShowRewardImage(false);
-      }
-
-      if (nextInBlock40 === 40) {
-        if (nextCorrectInBlock40 >= 39) {
-          setLastCompletedBlockCorrectCount(nextCorrectInBlock40);
-          setTimeout(() => {
-            setShowWishModal(true);
-          }, 1500);
-        }
-        setQuestionsInBlock40(0);
-        setCorrectInBlock40(0);
-      }
-    }
+    processAnswerResult(isCorrect, actualUserAnswer);
   };
 
   const handleNext = (force: boolean = false) => {
@@ -300,8 +226,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendWish = () => {
-    submitWish(() => handleNext(true));
+  const handleSendWish = async () => {
+    await handleWishSubmit();
+    handleNext(true);
   };
 
   const handleHomeClick = () => {
@@ -344,6 +271,7 @@ const App: React.FC = () => {
               getExpectedDigits={getExpectedDigits}
               onSubmit={handleSubmit}
               isColMultFilled={isColMultFilled}
+              registerCellRef={registerCellRef}
             />
           ) : problem.category === 'geometry' ? (
             <GeometryQuiz problem={problem} />
@@ -390,9 +318,9 @@ const App: React.FC = () => {
 
       {showWishModal && (
         <WishModal 
-          lastCompletedBlockCorrectCount={lastCompletedBlockCorrectCount}
+          lastCompletedBlockCorrectCount={correctInBlock40 || 40}
           wishText={wishText}
-          isSendingWish={isSendingWish}
+          isSendingWish={wishSubmitting}
           onWishTextChange={setWishText}
           onSendWish={handleSendWish}
         />

@@ -1,138 +1,179 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useReducer, useCallback, useEffect } from 'react';
 import { GameMode } from '../types';
 import { sendGameStats, sendWish } from '../services/statsService';
 
-export const useGameSession = (gameMode: GameMode | null) => {
-  const [questionsInBlock, setQuestionsInBlock] = useState<number>(0);
-  const [isPerfectBlock, setIsPerfectBlock] = useState<boolean>(true);
+/**
+ * Time (in ms) to delay showing the Wish Modal upon completing 40 questions.
+ * Gives the user time to see the answer feedback animation before the modal appears.
+ */
+export const WISH_MODAL_DELAY_MS = 1500;
 
-  const [totalQuestions, setTotalQuestions] = useState<number>(0);
-  const [totalCorrect, setTotalCorrect] = useState<number>(0);
+export interface GameSessionState {
+  totalQuestions: number;
+  totalCorrect: number;
+  streakCount: number;
+  questionsInBlock40: number;
+  correctInBlock40: number;
+  perfectBlocksCount: number;
+  showWishModal: boolean;
+  wishText: string;
+  wishSubmitted: boolean;
+  wishSubmitting: boolean;
+  wishError: string | null;
+  feedback: 'correct' | 'incorrect' | null;
+}
 
-  const [questionsInBlock40, setQuestionsInBlock40] = useState<number>(0);
-  const [correctInBlock40, setCorrectInBlock40] = useState<number>(0);
-  const [lastCompletedBlockCorrectCount, setLastCompletedBlockCorrectCount] = useState<number>(0);
+type GameSessionAction =
+  | { type: 'RECORD_ANSWER'; isCorrect: boolean }
+  | { type: 'CLEAR_FEEDBACK' }
+  | { type: 'SET_SHOW_WISH_MODAL'; show: boolean }
+  | { type: 'SET_WISH_TEXT'; text: string }
+  | { type: 'SUBMIT_WISH_START' }
+  | { type: 'SUBMIT_WISH_SUCCESS' }
+  | { type: 'SUBMIT_WISH_ERROR'; error: string }
+  | { type: 'RESET_SESSION' };
 
-  const [showWishModal, setShowWishModal] = useState<boolean>(false);
-  const [wishText, setWishText] = useState<string>("");
-  const [isSendingWish, setIsSendingWish] = useState<boolean>(false);
+export const INITIAL_GAME_SESSION_STATE: GameSessionState = {
+  totalQuestions: 0,
+  totalCorrect: 0,
+  streakCount: 0,
+  questionsInBlock40: 0,
+  correctInBlock40: 0,
+  perfectBlocksCount: 0,
+  showWishModal: false,
+  wishText: '',
+  wishSubmitted: false,
+  wishSubmitting: false,
+  wishError: null,
+  feedback: null,
+};
 
-  const [consecutivePerfectBlocks, setConsecutivePerfectBlocks] = useState<number>(0);
+function gameSessionReducer(state: GameSessionState, action: GameSessionAction): GameSessionState {
+  switch (action.type) {
+    case 'RECORD_ANSWER': {
+      const isCorrect = action.isCorrect;
+      const newTotalQuestions = state.totalQuestions + 1;
+      const newTotalCorrect = state.totalCorrect + (isCorrect ? 1 : 0);
+      const newStreakCount = isCorrect ? state.streakCount + 1 : 0;
+      
+      const newQuestionsInBlock40 = state.questionsInBlock40 + 1;
+      const newCorrectInBlock40 = state.correctInBlock40 + (isCorrect ? 1 : 0);
 
-  const [currentMessage, setCurrentMessage] = useState<string>("");
-  const [showRewardImage, setShowRewardImage] = useState<boolean>(false);
-  const [lastPhraseTemplate, setLastPhraseTemplate] = useState<string>("");
+      let newPerfectBlocksCount = state.perfectBlocksCount;
+      let nextQuestionsInBlock40 = newQuestionsInBlock40;
+      let nextCorrectInBlock40 = newCorrectInBlock40;
 
-  const statsRef = useRef({ mode: gameMode, total: totalQuestions, correct: totalCorrect });
-  const lastSentStatsRef = useRef({ total: 0, correct: 0 });
+      if (newQuestionsInBlock40 === 40) {
+        if (newCorrectInBlock40 === 40) {
+          newPerfectBlocksCount += 1;
+        }
+        nextQuestionsInBlock40 = 0;
+        nextCorrectInBlock40 = 0;
+      }
 
+      return {
+        ...state,
+        totalQuestions: newTotalQuestions,
+        totalCorrect: newTotalCorrect,
+        streakCount: newStreakCount,
+        questionsInBlock40: nextQuestionsInBlock40,
+        correctInBlock40: nextCorrectInBlock40,
+        perfectBlocksCount: newPerfectBlocksCount,
+        feedback: isCorrect ? 'correct' : 'incorrect',
+      };
+    }
+
+    case 'CLEAR_FEEDBACK':
+      return { ...state, feedback: null };
+
+    case 'SET_SHOW_WISH_MODAL':
+      return { ...state, showWishModal: action.show };
+
+    case 'SET_WISH_TEXT':
+      return { ...state, wishText: action.text };
+
+    case 'SUBMIT_WISH_START':
+      return { ...state, wishSubmitting: true, wishError: null };
+
+    case 'SUBMIT_WISH_SUCCESS':
+      return { ...state, wishSubmitting: false, wishSubmitted: true, wishText: '', showWishModal: false };
+
+    case 'SUBMIT_WISH_ERROR':
+      return { ...state, wishSubmitting: false, wishError: action.error };
+
+    case 'RESET_SESSION':
+      return INITIAL_GAME_SESSION_STATE;
+
+    default:
+      return state;
+  }
+}
+
+export const useGameSession = (gameMode: GameMode) => {
+  const [state, dispatch] = useReducer(gameSessionReducer, INITIAL_GAME_SESSION_STATE);
+
+  // Sync game stats on unmount or mode switch
   useEffect(() => {
-    statsRef.current = { mode: gameMode, total: totalQuestions, correct: totalCorrect };
-  }, [gameMode, totalQuestions, totalCorrect]);
-
-  const sendDataToSheets = useCallback((mode: GameMode, total: number, correct: number) => {
-    if (total === 0) return;
-
-    const deltaTotal = total - lastSentStatsRef.current.total;
-    const deltaCorrect = correct - lastSentStatsRef.current.correct;
-
-    if (deltaTotal <= 0) return;
-
-    lastSentStatsRef.current = { total, correct };
-    sendGameStats(mode, deltaTotal, deltaCorrect);
-  }, []);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        const { mode, total, correct } = statsRef.current;
-        if (mode && total > 0) sendDataToSheets(mode, total, correct);
+    return () => {
+      if (state.totalQuestions > 0) {
+        sendGameStats(gameMode, state.totalQuestions, state.totalCorrect);
       }
     };
+  }, [gameMode, state.totalQuestions, state.totalCorrect]);
 
-    const handleUnload = () => {
-      const { mode, total, correct } = statsRef.current;
-      if (mode && total > 0) sendDataToSheets(mode, total, correct);
-    };
+  const recordAnswer = useCallback((isCorrect: boolean): { isBlock40Completed: boolean } => {
+    const isBlock40Completed = state.questionsInBlock40 + 1 === 40;
 
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handleUnload);
+    dispatch({ type: 'RECORD_ANSWER', isCorrect });
 
-    return () => {
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handleUnload);
-    };
-  }, [sendDataToSheets]);
+    if (isBlock40Completed) {
+      setTimeout(() => {
+        dispatch({ type: 'SET_SHOW_WISH_MODAL', show: true });
+      }, WISH_MODAL_DELAY_MS);
+    }
 
-  const getUniqueRandomPhrase = useCallback((list: string[]) => {
-    let candidates = list.filter(phrase => phrase !== lastPhraseTemplate);
-    if (candidates.length === 0) candidates = list;
-    const selected = candidates[Math.floor(Math.random() * candidates.length)];
-    setLastPhraseTemplate(selected);
-    return selected;
-  }, [lastPhraseTemplate]);
+    return { isBlock40Completed };
+  }, [state.questionsInBlock40]);
+
+  const handleWishSubmit = useCallback(async () => {
+    if (!state.wishText.trim()) return;
+
+    dispatch({ type: 'SUBMIT_WISH_START' });
+    const success = await sendWish(state.wishText, state.correctInBlock40 || 40);
+
+    if (success) {
+      dispatch({ type: 'SUBMIT_WISH_SUCCESS' });
+    } else {
+      dispatch({ type: 'SUBMIT_WISH_ERROR', error: 'სურვილის გაგზავნა ვერ მოხერხდა' });
+    }
+  }, [state.wishText, state.correctInBlock40]);
+
+  const closeWishModal = useCallback(() => {
+    dispatch({ type: 'SET_SHOW_WISH_MODAL', show: false });
+  }, []);
+
+  const setWishText = useCallback((text: string) => {
+    dispatch({ type: 'SET_WISH_TEXT', text });
+  }, []);
+
+  const clearFeedback = useCallback(() => {
+    dispatch({ type: 'CLEAR_FEEDBACK' });
+  }, []);
 
   const resetSession = useCallback(() => {
-    if (gameMode && totalQuestions > 0) {
-      sendDataToSheets(gameMode, totalQuestions, totalCorrect);
+    if (state.totalQuestions > 0) {
+      sendGameStats(gameMode, state.totalQuestions, state.totalCorrect);
     }
-    setQuestionsInBlock(0);
-    setIsPerfectBlock(true);
-    setTotalQuestions(0);
-    setTotalCorrect(0);
-    setQuestionsInBlock40(0);
-    setCorrectInBlock40(0);
-    setConsecutivePerfectBlocks(0);
-    setCurrentMessage("");
-    setShowRewardImage(false);
-    lastSentStatsRef.current = { total: 0, correct: 0 };
-  }, [gameMode, totalQuestions, totalCorrect, sendDataToSheets]);
-
-  const submitWish = useCallback(async (onComplete: () => void) => {
-    if (!wishText.trim()) return;
-
-    setIsSendingWish(true);
-    try {
-      await sendWish(wishText, lastCompletedBlockCorrectCount);
-    } catch (error) {
-      console.error("ვერ მოხდა სურვილის გაგზავნა:", error);
-    } finally {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setIsSendingWish(false);
-      setShowWishModal(false);
-      setWishText("");
-      onComplete();
-    }
-  }, [wishText, lastCompletedBlockCorrectCount]);
+    dispatch({ type: 'RESET_SESSION' });
+  }, [gameMode, state.totalQuestions, state.totalCorrect]);
 
   return {
-    questionsInBlock,
-    setQuestionsInBlock,
-    isPerfectBlock,
-    setIsPerfectBlock,
-    totalQuestions,
-    setTotalQuestions,
-    totalCorrect,
-    setTotalCorrect,
-    questionsInBlock40,
-    setQuestionsInBlock40,
-    correctInBlock40,
-    setCorrectInBlock40,
-    lastCompletedBlockCorrectCount,
-    setLastCompletedBlockCorrectCount,
-    showWishModal,
-    setShowWishModal,
-    wishText,
+    ...state,
+    recordAnswer,
+    handleWishSubmit,
+    closeWishModal,
     setWishText,
-    isSendingWish,
-    consecutivePerfectBlocks,
-    setConsecutivePerfectBlocks,
-    currentMessage,
-    setCurrentMessage,
-    showRewardImage,
-    setShowRewardImage,
-    getUniqueRandomPhrase,
+    clearFeedback,
     resetSession,
-    submitWish
   };
 };
