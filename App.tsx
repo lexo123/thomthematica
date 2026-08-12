@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MathProblem, GameState, GameMode, ColMultState } from './types';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MathProblem, GameState, GameMode } from './types';
 import { Button } from './components/Button';
 import { ResultOverlay } from './components/ResultOverlay';
 import { Header } from './components/Header';
@@ -15,7 +15,9 @@ import {
   TIME_LIMIT,
 } from './services/problemGenerator';
 import { getExpectedDigits, getSolvingSequence } from './utils/columnMultiplication';
-import { sendGameStats, sendWish, GOOGLE_SHEETS_URL } from './services/statsService';
+import { useTimer } from './hooks/useTimer';
+import { useColumnMultiplication } from './hooks/useColumnMultiplication';
+import { useGameSession } from './hooks/useGameSession';
 
 const App: React.FC = () => {
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
@@ -23,209 +25,65 @@ const App: React.FC = () => {
   const [userAnswer, setUserAnswer] = useState<string>('');
   const [gameState, setGameState] = useState<GameState>(GameState.Playing);
 
-  const [colMultState, setColMultState] = useState<ColMultState>({
-    r1: ['', '', '', ''],
-    r2: ['', '', '', ''],
-    res: ['', '', '', '']
-  });
-
-  const [showKveshValidation, setShowKveshValidation] = useState<boolean>(false);
-  const [hasKveshFailedThisQuestion, setHasKveshFailedThisQuestion] = useState<boolean>(false);
-
-  const handleCellChange = (row: 'r1' | 'r2' | 'res', colIndex: number, val: string) => {
-    if (val === '') {
-      const newState = { ...colMultState };
-      newState[row][colIndex] = '';
-      setColMultState(newState);
-      return;
-    }
-
-    const digit = val.slice(-1);
-    if (!/^[0-9]$/.test(digit)) return;
-    
-    const newState = { ...colMultState };
-    newState[row][colIndex] = digit;
-    setColMultState(newState);
-
-    if (digit !== "" && problem) {
-      const sequence = getSolvingSequence(problem);
-      const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
-      if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
-        const nextCell = sequence[currentIndex + 1];
-        setTimeout(() => {
-          const el = document.getElementById(`cell-${nextCell.row}-${nextCell.col}`) as HTMLInputElement;
-          if (el) {
-            el.focus();
-            el.select();
-          }
-        }, 10);
-      }
-    }
-  };
-
-  const handleKeyDown = (row: 'r1' | 'r2' | 'res', colIndex: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      e.preventDefault();
-      
-      if (colMultState[row][colIndex] !== '') {
-        const newState = { ...colMultState };
-        newState[row][colIndex] = '';
-        setColMultState(newState);
-        return;
-      }
-
-      if (problem) {
-        const sequence = getSolvingSequence(problem);
-        const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
-        if (currentIndex > 0) {
-          const prevCell = sequence[currentIndex - 1];
-          const nextState = { ...colMultState };
-          nextState[prevCell.row][prevCell.col] = '';
-          setColMultState(nextState);
-          setTimeout(() => {
-            const el = document.getElementById(`cell-${prevCell.row}-${prevCell.col}`) as HTMLInputElement;
-            if (el) {
-              el.focus();
-              el.select();
-            }
-          }, 10);
-        }
-      }
-      return;
-    }
-
-    if ((e.key === 'Enter' || e.key === ' ') && problem) {
-      e.preventDefault();
-      const sequence = getSolvingSequence(problem);
-      const currentIndex = sequence.findIndex(item => item.row === row && item.col === colIndex);
-      if (currentIndex !== -1 && currentIndex < sequence.length - 1) {
-        const nextCell = sequence[currentIndex + 1];
-        setTimeout(() => {
-          const el = document.getElementById(`cell-${nextCell.row}-${nextCell.col}`) as HTMLInputElement;
-          if (el) {
-            el.focus();
-            el.select();
-          }
-        }, 10);
-      }
-      return;
-    }
-
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      if (colIndex > 0) {
-        const el = document.getElementById(`cell-${row}-${colIndex - 1}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
-      } else {
-        const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
-        if (nextRow) {
-          const el = document.getElementById(`cell-${nextRow}-3`) as HTMLInputElement;
-          if (el) { el.focus(); el.select(); }
-        }
-      }
-      return;
-    }
-
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      if (colIndex < 3) {
-        const el = document.getElementById(`cell-${row}-${colIndex + 1}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
-      } else {
-        const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
-        if (prevRow) {
-          const el = document.getElementById(`cell-${prevRow}-0`) as HTMLInputElement;
-          if (el) { el.focus(); el.select(); }
-        }
-      }
-      return;
-    }
-
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prevRow = row === 'res' ? 'r2' : row === 'r2' ? 'r1' : null;
-      if (prevRow) {
-        const el = document.getElementById(`cell-${prevRow}-${colIndex}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
-      }
-      return;
-    }
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const nextRow = row === 'r1' ? 'r2' : row === 'r2' ? 'res' : null;
-      if (nextRow) {
-        const el = document.getElementById(`cell-${nextRow}-${colIndex}`) as HTMLInputElement;
-        if (el) { el.focus(); el.select(); }
-      }
-      return;
-    }
-  };
-  
-  const [questionsInBlock, setQuestionsInBlock] = useState<number>(0); 
-  const [isPerfectBlock, setIsPerfectBlock] = useState<boolean>(true);
-  
-  const [totalQuestions, setTotalQuestions] = useState<number>(0);
-  const [totalCorrect, setTotalCorrect] = useState<number>(0);
-
-  const [questionsInBlock40, setQuestionsInBlock40] = useState<number>(0);
-  const [correctInBlock40, setCorrectInBlock40] = useState<number>(0);
-  const [lastCompletedBlockCorrectCount, setLastCompletedBlockCorrectCount] = useState<number>(0);
-  const [showWishModal, setShowWishModal] = useState<boolean>(false);
-  const [wishText, setWishText] = useState<string>("");
-  const [isSendingWish, setIsSendingWish] = useState<boolean>(false);
-
-  const [consecutivePerfectBlocks, setConsecutivePerfectBlocks] = useState<number>(0);
-
-  const [currentMessage, setCurrentMessage] = useState<string>("");
-  const [showRewardImage, setShowRewardImage] = useState<boolean>(false);
-  const [lastPhraseTemplate, setLastPhraseTemplate] = useState<string>("");
-
-  const [timeLeft, setTimeLeft] = useState<number>(TIME_LIMIT);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const statsRef = useRef({ mode: gameMode, total: totalQuestions, correct: totalCorrect });
-  const lastSentStatsRef = useRef({ total: 0, correct: 0 });
+  const {
+    questionsInBlock,
+    setQuestionsInBlock,
+    isPerfectBlock,
+    setIsPerfectBlock,
+    setTotalQuestions,
+    totalQuestions,
+    totalCorrect,
+    setTotalCorrect,
+    questionsInBlock40,
+    setQuestionsInBlock40,
+    correctInBlock40,
+    setCorrectInBlock40,
+    lastCompletedBlockCorrectCount,
+    setLastCompletedBlockCorrectCount,
+    showWishModal,
+    setShowWishModal,
+    wishText,
+    setWishText,
+    isSendingWish,
+    consecutivePerfectBlocks,
+    setConsecutivePerfectBlocks,
+    currentMessage,
+    setCurrentMessage,
+    showRewardImage,
+    setShowRewardImage,
+    getUniqueRandomPhrase,
+    resetSession,
+    submitWish
+  } = useGameSession(gameMode);
 
-  useEffect(() => {
-    statsRef.current = { mode: gameMode, total: totalQuestions, correct: totalCorrect };
-  }, [gameMode, totalQuestions, totalCorrect]);
-
-  const sendDataToSheets = (mode: GameMode, total: number, correct: number) => {
-    if (total === 0) return;
+  const handleTimeOut = useCallback(() => {
+    setIsPerfectBlock(false);
+    setConsecutivePerfectBlocks(0);
+    setTotalQuestions(prev => prev + 1);
     
-    const deltaTotal = total - lastSentStatsRef.current.total;
-    const deltaCorrect = correct - lastSentStatsRef.current.correct;
-    
-    if (deltaTotal <= 0) return;
-    
-    lastSentStatsRef.current = { total, correct };
-    sendGameStats(mode, deltaTotal, deltaCorrect);
-  };
+    setCurrentMessage("დრო ამოიწურა! წააგე.");
+    setGameState(GameState.Incorrect);
+    setShowRewardImage(false);
+  }, [setIsPerfectBlock, setConsecutivePerfectBlocks, setTotalQuestions, setCurrentMessage, setShowRewardImage]);
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        const { mode, total, correct } = statsRef.current;
-        if (mode && total > 0) sendDataToSheets(mode, total, correct);
-      }
-    };
+  const { timeLeft, startTimer, stopTimer } = useTimer({
+    timeLimit: TIME_LIMIT,
+    onTimeOut: handleTimeOut
+  });
 
-    const handleUnload = () => {
-      const { mode, total, correct } = statsRef.current;
-      if (mode && total > 0) sendDataToSheets(mode, total, correct);
-    };
-
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', handleUnload);
-    
-    return () => {
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', handleUnload);
-    };
-  }, []);
+  const {
+    colMultState,
+    showKveshValidation,
+    setShowKveshValidation,
+    hasKveshFailedThisQuestion,
+    setHasKveshFailedThisQuestion,
+    handleCellChange,
+    handleKeyDown,
+    isColMultFilled,
+    resetColMultState
+  } = useColumnMultiplication(problem);
 
   useEffect(() => {
     if (gameMode) {
@@ -254,53 +112,6 @@ const App: React.FC = () => {
     }
   }, [gameState, gameMode, problem]);
 
-  const startTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setTimeLeft(TIME_LIMIT);
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleTimeOut();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const stopTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
-  const handleTimeOut = () => {
-    stopTimer();
-    setIsPerfectBlock(false);
-    setConsecutivePerfectBlocks(0);
-    setTotalQuestions(prev => prev + 1);
-    
-    setCurrentMessage("დრო ამოიწურა! წააგე.");
-    setGameState(GameState.Incorrect);
-    setShowRewardImage(false);
-  };
-
-  const getUniqueRandomPhrase = (list: string[]) => {
-    let candidates = list.filter(phrase => phrase !== lastPhraseTemplate);
-    if (candidates.length === 0) candidates = list;
-    const selected = candidates[Math.floor(Math.random() * candidates.length)];
-    setLastPhraseTemplate(selected);
-    return selected;
-  };
-
-  const isColMultFilled = () => {
-    if (!problem) return false;
-    return colMultState.r1.some(v => v !== '') || 
-           colMultState.r2.some(v => v !== '') || 
-           colMultState.res.some(v => v !== '');
-  };
-
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!problem) return;
@@ -313,7 +124,8 @@ const App: React.FC = () => {
     let actualUserAnswer = userAnswer;
 
     if (gameMode === GameMode.Kveshmicera) {
-      const { r1: expR1, r2: expR2, res: expRes } = getExpectedDigits(problem.num1!, problem.num2!);
+      if (!('num1' in problem && 'num2' in problem)) return;
+      const { r1: expR1, r2: expR2, res: expRes } = getExpectedDigits(problem.num1, problem.num2);
       let isAllCorrect = true;
       for (let c = 0; c < 4; c++) {
         if (colMultState.r1[c] !== expR1[c]) isAllCorrect = false;
@@ -459,11 +271,7 @@ const App: React.FC = () => {
     if (showWishModal && !force) return;
     if (gameState === GameState.Incorrect) {
       setUserAnswer('');
-      setColMultState({
-        r1: ['', '', '', ''],
-        r2: ['', '', '', ''],
-        res: ['', '', '', '']
-      });
+      resetColMultState();
       setGameState(GameState.Playing);
       if (gameMode === GameMode.ThomravlebisTabula) {
         startTimer();
@@ -479,15 +287,11 @@ const App: React.FC = () => {
         nextIndex = 0;
       }
 
-      setProblem(generateProblem(gameMode!, nextIndex));
+      if (gameMode) {
+        setProblem(generateProblem(gameMode, nextIndex));
+      }
       setUserAnswer('');
-      setColMultState({
-        r1: ['', '', '', ''],
-        r2: ['', '', '', ''],
-        res: ['', '', '', '']
-      });
-      setShowKveshValidation(false);
-      setHasKveshFailedThisQuestion(false);
+      resetColMultState();
       setGameState(GameState.Playing);
       setShowRewardImage(false);
       if (gameMode === GameMode.ThomravlebisTabula) {
@@ -496,35 +300,14 @@ const App: React.FC = () => {
     }
   };
 
-  const sendWishToSheets = async () => {
-    if (!wishText.trim()) return;
-
-    setIsSendingWish(true);
-    try {
-      await sendWish(wishText, lastCompletedBlockCorrectCount);
-    } catch (error) {
-      console.error("ვერ მოხდა სურვილის გაგზავნა:", error);
-    } finally {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setIsSendingWish(false);
-      setShowWishModal(false);
-      setWishText("");
-      handleNext(true);
-    }
+  const handleSendWish = () => {
+    submitWish(() => handleNext(true));
   };
 
   const handleHomeClick = () => {
-    if (gameMode && totalQuestions > 0) {
-      sendDataToSheets(gameMode, totalQuestions, totalCorrect);
-    }
+    resetSession();
     setGameMode(null);
     setProblem(null);
-    setQuestionsInBlock(0);
-    setIsPerfectBlock(true);
-    setTotalQuestions(0);
-    setTotalCorrect(0);
-    setConsecutivePerfectBlocks(0);
-    lastSentStatsRef.current = { total: 0, correct: 0 };
     stopTimer();
   };
 
@@ -611,7 +394,7 @@ const App: React.FC = () => {
           wishText={wishText}
           isSendingWish={isSendingWish}
           onWishTextChange={setWishText}
-          onSendWish={sendWishToSheets}
+          onSendWish={handleSendWish}
         />
       )}
     </div>

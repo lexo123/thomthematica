@@ -8,12 +8,11 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
+    "lint": "npm run typecheck",
     "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
-    "gh-pages": "^6.3.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
   },

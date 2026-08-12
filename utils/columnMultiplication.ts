@@ -53,7 +53,7 @@ export const getExpectedDigits = (num1: number, num2: number): ExpectedDigits =>
  * Determines the step-by-step navigation order for column multiplication inputs
  */
 export const getSolvingSequence = (problem: MathProblem | null): CellPosition[] => {
-  if (!problem || problem.num1 === undefined || problem.num2 === undefined) return [];
+  if (!problem || !('num1' in problem) || problem.num1 === undefined || problem.num2 === undefined) return [];
   
   const sequence: CellPosition[] = [];
   

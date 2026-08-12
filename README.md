@@ -28,7 +28,8 @@
 
 ```
 ├── components/          # UI კომპონენტები (Header, MainMenu, MathQuiz, GeometryQuiz, ColumnMultiplication, etc.)
-├── data/                # სტატიკური მონაცემები (rewards, gifs)
+├── hooks/               # Custom React Hooks (useTimer, useColumnMultiplication, useGameSession)
+├── data/                # სტატიკური მონაცემები (rewards)
 ├── services/            # გარე სერვისები (problemGenerator, statsService)
 ├── utils/               # მათემატიკური გამოთვლები და დამხმარე ფუნქციები (mathUtils, columnMultiplication)
 ├── types.ts             # TypeScript ტიპები და ინტერფეისები
@@ -42,10 +43,10 @@
 
 ```bash
 # 1. რეპოზიტორიის კლონირება
-git clone https://github.com/USERNAME/REPOSITORY_NAME.git
+git clone https://github.com/lexo123/thomthematica.git
 
 # 2. საქაღალდეში გადასვლა
-cd REPOSITORY_NAME
+cd thomthematica
 
 # 3. დამოკიდებულებების დაინსტალირება
 npm install

@@ -42,21 +42,7 @@ export interface GeometryProblem extends BaseProblem {
   shapeVariant?: number;
 }
 
-export type MathProblem = {
-  category?: ProblemCategory;
-  num1?: number;
-  num2?: number;
-  num3?: number;
-  operation?: Operation;
-  operation2?: Operation;
-  missingPart?: MissingPart;
-  equationResult?: number;
-  figure?: FigureType;
-  measurement?: MeasurementType;
-  sides?: number[];
-  shapeVariant?: number;
-  answer: number;
-};
+export type MathProblem = ArithmeticProblem | GeometryProblem;
 
 export enum GameState {
   Playing,
