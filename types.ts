@@ -19,12 +19,12 @@ export type FigureType = 'square' | 'rectangle' | 'triangle' | 'pentagon' | 'hex
 export type MeasurementType = 'perimeter' | 'area' | 'sidesCount' | 'anglesCount';
 
 export interface BaseProblem {
-  category?: ProblemCategory;
+  category: ProblemCategory;
   answer: number;
 }
 
 export interface ArithmeticProblem extends BaseProblem {
-  category?: 'math';
+  category: 'math';
   num1: number;
   num2: number;
   num3?: number;

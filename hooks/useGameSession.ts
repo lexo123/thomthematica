@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { GameMode } from '../types';
 import { sendGameStats, sendWish } from '../services/statsService';
 
@@ -14,6 +14,7 @@ export interface GameSessionState {
   streakCount: number;
   questionsInBlock40: number;
   correctInBlock40: number;
+  lastCompletedBlockCorrectCount: number;
   perfectBlocksCount: number;
   showWishModal: boolean;
   wishText: string;
@@ -39,6 +40,7 @@ export const INITIAL_GAME_SESSION_STATE: GameSessionState = {
   streakCount: 0,
   questionsInBlock40: 0,
   correctInBlock40: 0,
+  lastCompletedBlockCorrectCount: 0,
   perfectBlocksCount: 0,
   showWishModal: false,
   wishText: '',
@@ -48,7 +50,7 @@ export const INITIAL_GAME_SESSION_STATE: GameSessionState = {
   feedback: null,
 };
 
-function gameSessionReducer(state: GameSessionState, action: GameSessionAction): GameSessionState {
+export function gameSessionReducer(state: GameSessionState, action: GameSessionAction): GameSessionState {
   switch (action.type) {
     case 'RECORD_ANSWER': {
       const isCorrect = action.isCorrect;
@@ -62,8 +64,10 @@ function gameSessionReducer(state: GameSessionState, action: GameSessionAction):
       let newPerfectBlocksCount = state.perfectBlocksCount;
       let nextQuestionsInBlock40 = newQuestionsInBlock40;
       let nextCorrectInBlock40 = newCorrectInBlock40;
+      let lastCompletedBlockCorrectCount = state.lastCompletedBlockCorrectCount;
 
       if (newQuestionsInBlock40 === 40) {
+        lastCompletedBlockCorrectCount = newCorrectInBlock40;
         if (newCorrectInBlock40 === 40) {
           newPerfectBlocksCount += 1;
         }
@@ -78,6 +82,7 @@ function gameSessionReducer(state: GameSessionState, action: GameSessionAction):
         streakCount: newStreakCount,
         questionsInBlock40: nextQuestionsInBlock40,
         correctInBlock40: nextCorrectInBlock40,
+        lastCompletedBlockCorrectCount,
         perfectBlocksCount: newPerfectBlocksCount,
         feedback: isCorrect ? 'correct' : 'incorrect',
       };
@@ -109,17 +114,50 @@ function gameSessionReducer(state: GameSessionState, action: GameSessionAction):
   }
 }
 
-export const useGameSession = (gameMode: GameMode) => {
+export const useGameSession = (gameMode: GameMode | null) => {
   const [state, dispatch] = useReducer(gameSessionReducer, INITIAL_GAME_SESSION_STATE);
+
+  const latestStatsRef = useRef({
+    gameMode,
+    totalQuestions: state.totalQuestions,
+    totalCorrect: state.totalCorrect,
+    sent: false
+  });
+
+  useEffect(() => {
+    latestStatsRef.current = {
+      gameMode,
+      totalQuestions: state.totalQuestions,
+      totalCorrect: state.totalCorrect,
+      sent: false
+    };
+  }, [gameMode, state.totalQuestions, state.totalCorrect]);
+
+  const flushStats = useCallback(() => {
+    const { gameMode: mode, totalQuestions, totalCorrect, sent } = latestStatsRef.current;
+    if (mode && totalQuestions > 0 && !sent) {
+      latestStatsRef.current.sent = true;
+      sendGameStats(mode, totalQuestions, totalCorrect);
+    }
+  }, []);
 
   // Sync game stats on unmount or mode switch
   useEffect(() => {
     return () => {
-      if (state.totalQuestions > 0) {
-        sendGameStats(gameMode, state.totalQuestions, state.totalCorrect);
-      }
+      flushStats();
     };
-  }, [gameMode, state.totalQuestions, state.totalCorrect]);
+  }, [gameMode, flushStats]);
+
+  // Sync game stats when user closes tab/window
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      flushStats();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [flushStats]);
 
   const recordAnswer = useCallback((isCorrect: boolean): { isBlock40Completed: boolean } => {
     const isBlock40Completed = state.questionsInBlock40 + 1 === 40;
@@ -135,18 +173,20 @@ export const useGameSession = (gameMode: GameMode) => {
     return { isBlock40Completed };
   }, [state.questionsInBlock40]);
 
-  const handleWishSubmit = useCallback(async () => {
-    if (!state.wishText.trim()) return;
+  const handleWishSubmit = useCallback(async (): Promise<boolean> => {
+    if (!state.wishText.trim()) return false;
 
     dispatch({ type: 'SUBMIT_WISH_START' });
-    const success = await sendWish(state.wishText, state.correctInBlock40 || 40);
+    const success = await sendWish(state.wishText, state.lastCompletedBlockCorrectCount);
 
     if (success) {
       dispatch({ type: 'SUBMIT_WISH_SUCCESS' });
+      return true;
     } else {
       dispatch({ type: 'SUBMIT_WISH_ERROR', error: 'სურვილის გაგზავნა ვერ მოხერხდა' });
+      return false;
     }
-  }, [state.wishText, state.correctInBlock40]);
+  }, [state.wishText, state.lastCompletedBlockCorrectCount]);
 
   const closeWishModal = useCallback(() => {
     dispatch({ type: 'SET_SHOW_WISH_MODAL', show: false });
@@ -161,11 +201,9 @@ export const useGameSession = (gameMode: GameMode) => {
   }, []);
 
   const resetSession = useCallback(() => {
-    if (state.totalQuestions > 0) {
-      sendGameStats(gameMode, state.totalQuestions, state.totalCorrect);
-    }
+    flushStats();
     dispatch({ type: 'RESET_SESSION' });
-  }, [gameMode, state.totalQuestions, state.totalCorrect]);
+  }, [flushStats]);
 
   return {
     ...state,

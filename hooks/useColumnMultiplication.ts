@@ -40,6 +40,14 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
     }
   }, []);
 
+  const focusFirstCell = useCallback((prob: MathProblem) => {
+    const sequence = getSolvingSequence(prob);
+    if (sequence.length > 0) {
+      const firstCell = sequence[0];
+      focusCell(firstCell.row, firstCell.col);
+    }
+  }, [focusCell]);
+
   const resetColMultState = useCallback(() => {
     setColMultState({
       r1: ['', '', '', ''],
@@ -184,6 +192,7 @@ export const useColumnMultiplication = (problem: MathProblem | null) => {
     handleKeyDown,
     isColMultFilled,
     resetColMultState,
-    registerCellRef
+    registerCellRef,
+    focusFirstCell
   };
 };

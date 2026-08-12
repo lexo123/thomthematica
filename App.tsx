@@ -14,7 +14,7 @@ import {
   INCORRECT_PHRASES,
   TIME_LIMIT,
 } from './services/problemGenerator';
-import { getExpectedDigits, getSolvingSequence } from './utils/columnMultiplication';
+import { getExpectedDigits } from './utils/columnMultiplication';
 import { useTimer } from './hooks/useTimer';
 import { useColumnMultiplication } from './hooks/useColumnMultiplication';
 import { useGameSession } from './hooks/useGameSession';
@@ -40,7 +40,7 @@ const App: React.FC = () => {
   const {
     totalQuestions,
     totalCorrect,
-    correctInBlock40,
+    lastCompletedBlockCorrectCount,
     showWishModal,
     wishText,
     wishSubmitting,
@@ -49,9 +49,9 @@ const App: React.FC = () => {
     closeWishModal,
     setWishText,
     resetSession,
-  } = useGameSession(gameMode || GameMode.Thomthematica);
+  } = useGameSession(gameMode);
 
-  const getUniqueRandomPhrase = useCallback((phrases: string[]) => {
+  const getRandomPhrase = useCallback((phrases: string[]) => {
     return phrases[Math.floor(Math.random() * phrases.length)];
   }, []);
 
@@ -81,6 +81,7 @@ const App: React.FC = () => {
     isColMultFilled,
     resetColMultState,
     registerCellRef,
+    focusFirstCell,
   } = useColumnMultiplication(problem);
 
   useEffect(() => {
@@ -97,20 +98,14 @@ const App: React.FC = () => {
       if (gameMode === GameMode.Kveshmicera) {
         setTimeout(() => {
           if (problem) {
-            const sequence = getSolvingSequence(problem);
-            if (sequence.length > 0) {
-              const firstCell = sequence[0];
-              const key = `${firstCell.row}-${firstCell.col}`;
-              const el = document.getElementById(`cell-${key}`) as HTMLInputElement;
-              if (el) { el.focus(); el.select(); }
-            }
+            focusFirstCell(problem);
           }
         }, KVESH_FIRST_CELL_FOCUS_DELAY_MS);
       } else {
         inputRef.current?.focus();
       }
     }
-  }, [gameState, gameMode, problem]);
+  }, [gameState, gameMode, problem, focusFirstCell]);
 
   const processAnswerResult = (isCorrect: boolean, actualUserAnswer: string) => {
     const shouldRecord = gameMode !== GameMode.Kveshmicera || !hasKveshFailedThisQuestion;
@@ -133,7 +128,7 @@ const App: React.FC = () => {
       const nextQuestionsInBlock = questionsInBlock + 1;
       setQuestionsInBlock(nextQuestionsInBlock);
 
-      let message = getUniqueRandomPhrase(CORRECT_PHRASES);
+      let message = getRandomPhrase(CORRECT_PHRASES);
 
       if (nextQuestionsInBlock === 3) {
         setShowRewardImage(true);
@@ -152,7 +147,7 @@ const App: React.FC = () => {
       setIsPerfectBlock(false);
       setConsecutivePerfectBlocks(0);
 
-      const template = getUniqueRandomPhrase(INCORRECT_PHRASES);
+      const template = getRandomPhrase(INCORRECT_PHRASES);
       const finalMessage = template.replace("[]", actualUserAnswer);
       
       setCurrentMessage(finalMessage);
@@ -227,8 +222,10 @@ const App: React.FC = () => {
   };
 
   const handleSendWish = async () => {
-    await handleWishSubmit();
-    handleNext(true);
+    const success = await handleWishSubmit();
+    if (success) {
+      handleNext(true);
+    }
   };
 
   const handleHomeClick = () => {
@@ -318,7 +315,7 @@ const App: React.FC = () => {
 
       {showWishModal && (
         <WishModal 
-          lastCompletedBlockCorrectCount={correctInBlock40 || 40}
+          lastCompletedBlockCorrectCount={lastCompletedBlockCorrectCount}
           wishText={wishText}
           isSendingWish={wishSubmitting}
           onWishTextChange={setWishText}
