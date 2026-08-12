@@ -1,20 +1,76 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Thomthematica (თომთემატიკა) 🧮
 
-# Run and deploy your AI Studio app
+**Thomthematica** არის ინტერაქტიული, საგანმანათლებლო მათემატიკური აპლიკაცია დაწყებითი და საბაზო საფეხურის მოსწავლეებისთვის. აპლიკაცია ეხმარება ბავშვებს მათემატიკური და გეომეტრიული უნარების განვითარებაში მხიარული თამაშისა და ჯილდოების სისტემის მეშვეობით.
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/a497ba0a-2232-4f7e-9215-5adaae4cdfa0
+## 🌟 ძირითადი ფუნქციები (Features)
 
-## Run Locally
+- ➕ **თომთემატიკა (არითმეტიკა):** მიმატება, გამოკლება, გამრავლება, გაყოფა და განტოლებები.
+- ✖️ **თომრავლების ტაბულა:** გამრავლების ტაბულის სავარჯიშოები დროის ლიმიტით (10 წამი თითო კითხვაზე).
+- 📐 **გეთომეტრია:** გეომეტრიული ფიგურების (კვადრატი, მართკუთხედი, სამკუთხედი, მრავალკუთხედები) პერიმეტრის, ფართობის, გვერდებისა და კუთხეების დათვლა.
+- 📝 **ქვეშმიწერით გამრავლება:** 2-ნიშნა რიცხვების ეტაპობრივი, ინტერაქტიული გამრავლება ქვეშმიწერის წესების დაცვით.
+- 🏆 **ჯილდოები და მოტივაცია:** ყოველ 3 სწორ პასუხზე მოსწავლე იღებს მხიარულ ტიტულებსა და სურათებს. 40 კითხვის წარმატებით ამოხსნისას ეხსნება სურვილის ჩასაწერი ფანჯარა.
+- 📊 **სტატისტიკა:** მონაცემების ავტომატური სინქრონიზაცია Google Sheets-თან.
 
-**Prerequisites:**  Node.js
+---
 
+## 🛠️ ტექნოლოგიური სტეკი (Tech Stack)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
+- **Testing:** Vitest
+- **Backend / Storage Integration:** Google Apps Script & Google Sheets API
+- **Deployment:** GitHub Pages / GitHub Actions
+
+---
+
+## 🏗️ არქიტექტურა (Architecture)
+
+```
+├── components/          # UI კომპონენტები (Header, MainMenu, MathQuiz, GeometryQuiz, ColumnMultiplication, etc.)
+├── data/                # სტატიკური მონაცემები (rewards, gifs)
+├── services/            # გარე სერვისები (problemGenerator, statsService)
+├── utils/               # მათემატიკური გამოთვლები და დამხმარე ფუნქციები (mathUtils, columnMultiplication)
+├── types.ts             # TypeScript ტიპები და ინტერფეისები
+├── App.tsx              # აპლიკაციის ძირითადი ორკესტრაცია
+└── index.tsx            # საწყისი წერტილი ErrorBoundary-ით
+```
+
+---
+
+## 🚀 ინსტალაცია და გაშვება (Setup & Installation)
+
+```bash
+# 1. რეპოზიტორიის კლონირება
+git clone https://github.com/USERNAME/REPOSITORY_NAME.git
+
+# 2. საქაღალდეში გადასვლა
+cd REPOSITORY_NAME
+
+# 3. დამოკიდებულებების დაინსტალირება
+npm install
+
+# 4. დეველოპმენტ სერვერის გაშვება
+npm run dev
+```
+
+---
+
+## 🧪 ტესტირება და შემოწმება (Testing & Checks)
+
+```bash
+# Typecheck (TypeScript შემოწმება)
+npm run typecheck
+
+# Unit ტესტების გაშვება Vitest-ით
+npm run test
+
+# Production Build აწყობა
+npm run build
+```
+
+---
+
+## 📜 ლიცენზია
+
+პროექტი შექმნილია სასწავლო და საგანმანათლებლო მიზნებისთვის.

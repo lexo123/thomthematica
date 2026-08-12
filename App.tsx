@@ -13,8 +13,9 @@ import {
   CORRECT_PHRASES,
   INCORRECT_PHRASES,
   TIME_LIMIT,
-  GOOGLE_SHEETS_URL
 } from './services/problemGenerator';
+import { getExpectedDigits, getSolvingSequence } from './utils/columnMultiplication';
+import { sendGameStats, sendWish, GOOGLE_SHEETS_URL } from './services/statsService';
 
 const App: React.FC = () => {
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
@@ -30,56 +31,6 @@ const App: React.FC = () => {
 
   const [showKveshValidation, setShowKveshValidation] = useState<boolean>(false);
   const [hasKveshFailedThisQuestion, setHasKveshFailedThisQuestion] = useState<boolean>(false);
-
-  const getExpectedDigits = (num1: number, num2: number) => {
-    const bOnes = num2 % 10;
-    const bTens = Math.floor(num2 / 10);
-    
-    const r1Val = num1 * bOnes;
-    const r2Val = num1 * bTens;
-    const resVal = num1 * num2;
-    
-    const r1 = [
-      r1Val >= 1000 ? (Math.floor(r1Val / 1000) % 10).toString() : "",
-      r1Val >= 100 ? (Math.floor(r1Val / 100) % 10).toString() : "",
-      r1Val >= 10 ? (Math.floor(r1Val / 10) % 10).toString() : "",
-      (r1Val % 10).toString()
-    ];
-    
-    const r2 = [
-      r2Val >= 100 ? (Math.floor(r2Val / 100) % 10).toString() : "",
-      r2Val >= 10 ? (Math.floor(r2Val / 10) % 10).toString() : "",
-      (r2Val % 10).toString(),
-      ""
-    ];
-    
-    const res = [
-      resVal >= 1000 ? (Math.floor(resVal / 1000) % 10).toString() : "",
-      resVal >= 100 ? (Math.floor(resVal / 100) % 10).toString() : "",
-      resVal >= 10 ? (Math.floor(resVal / 10) % 10).toString() : "",
-      (resVal % 10).toString()
-    ];
-    
-    return { r1, r2, res };
-  };
-
-  const getSolvingSequence = (prob: MathProblem) => {
-    if (!prob || prob.num1 === undefined || prob.num2 === undefined) return [];
-    
-    const sequence: { row: 'r1' | 'r2' | 'res'; col: number }[] = [];
-    
-    for (let c = 3; c >= 0; c--) {
-      sequence.push({ row: 'r1', col: c });
-    }
-    for (let c = 3; c >= 0; c--) {
-      sequence.push({ row: 'r2', col: c });
-    }
-    for (let c = 3; c >= 0; c--) {
-      sequence.push({ row: 'res', col: c });
-    }
-    
-    return sequence;
-  };
 
   const handleCellChange = (row: 'r1' | 'r2' | 'res', colIndex: number, val: string) => {
     if (val === '') {
@@ -243,32 +194,15 @@ const App: React.FC = () => {
   }, [gameMode, totalQuestions, totalCorrect]);
 
   const sendDataToSheets = (mode: GameMode, total: number, correct: number) => {
-    if (total === 0 || (GOOGLE_SHEETS_URL as string) === "YOUR_WEB_APP_URL_HERE") return;
+    if (total === 0) return;
     
     const deltaTotal = total - lastSentStatsRef.current.total;
     const deltaCorrect = correct - lastSentStatsRef.current.correct;
     
     if (deltaTotal <= 0) return;
     
-    const modeName = mode === GameMode.Thomthematica ? 'თომთემატიკა' : 
-                     mode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 
-                     mode === GameMode.Gethometria ? 'გეთომეტრია' : 'ქვეშმიწერით გამრავლება';
-    const payload = JSON.stringify({ gameMode: modeName, totalQuestions: deltaTotal, totalCorrect: deltaCorrect });
-    
     lastSentStatsRef.current = { total, correct };
-
-    if (navigator.sendBeacon) {
-      const blob = new Blob([payload], { type: 'text/plain' });
-      navigator.sendBeacon(GOOGLE_SHEETS_URL, blob);
-    } else {
-      fetch(GOOGLE_SHEETS_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: payload,
-        keepalive: true
-      }).catch(console.error);
-    }
+    sendGameStats(mode, deltaTotal, deltaCorrect);
   };
 
   useEffect(() => {
@@ -566,35 +500,8 @@ const App: React.FC = () => {
     if (!wishText.trim()) return;
 
     setIsSendingWish(true);
-    const modeName = gameMode === GameMode.Thomthematica ? 'თომთემატიკა' : 
-                     gameMode === GameMode.ThomravlebisTabula ? 'თომრავლების ტაბულა' : 
-                     gameMode === GameMode.Gethometria ? 'გეთომეტრია' : 'ქვეშმიწერით გამრავლება';
-
-    const payload = JSON.stringify({ 
-      gameMode: modeName, 
-      totalQuestions: 40,
-      totalCorrect: lastCompletedBlockCorrectCount,
-      wish: wishText,
-      wishText: wishText,
-      wish_text: wishText,
-      "სურვილი": wishText,
-      "Wish": wishText,
-      "WishText": wishText
-    });
-
     try {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
-        navigator.sendBeacon(GOOGLE_SHEETS_URL, blob);
-      } else {
-        await fetch(GOOGLE_SHEETS_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: payload,
-          keepalive: true
-        });
-      }
+      await sendWish(wishText, lastCompletedBlockCorrectCount);
     } catch (error) {
       console.error("ვერ მოხდა სურვილის გაგზავნა:", error);
     } finally {

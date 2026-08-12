@@ -18,27 +18,45 @@ export type ProblemCategory = 'math' | 'geometry';
 export type FigureType = 'square' | 'rectangle' | 'triangle' | 'pentagon' | 'hexagon' | 'irregular_pentagon' | 'irregular_hexagon' | 'irregular_quadrilateral';
 export type MeasurementType = 'perimeter' | 'area' | 'sidesCount' | 'anglesCount';
 
-export interface MathProblem {
-  category?: ProblemCategory; // default 'math'
-  
-  // მათემატიკის ველები
+export interface BaseProblem {
+  category?: ProblemCategory;
+  answer: number;
+}
+
+export interface ArithmeticProblem extends BaseProblem {
+  category?: 'math';
+  num1: number;
+  num2: number;
+  num3?: number;
+  operation: Operation;
+  operation2?: Operation;
+  missingPart?: MissingPart;
+  equationResult?: number;
+}
+
+export interface GeometryProblem extends BaseProblem {
+  category: 'geometry';
+  figure: FigureType;
+  measurement: MeasurementType;
+  sides: number[];
+  shapeVariant?: number;
+}
+
+export type MathProblem = {
+  category?: ProblemCategory;
   num1?: number;
   num2?: number;
-  num3?: number;       // მესამე რიცხვი (არასავალდებულო)
+  num3?: number;
   operation?: Operation;
-  operation2?: Operation; // მეორე მოქმედება (არასავალდებულო)
-  missingPart?: MissingPart; // რომელი ნაწილია გამოსაცნობი
-  equationResult?: number;   // განტოლების რეალური შედეგი (ვიზუალიზაციისთვის)
-  
-  // გეომეტრიის ველები
+  operation2?: Operation;
+  missingPart?: MissingPart;
+  equationResult?: number;
   figure?: FigureType;
   measurement?: MeasurementType;
-  sides?: number[]; // [a] კვადრატისთვის, [a,b] მართკუთხედისთვის, [a,b,c] სამკუთხედისთვის
-  shapeVariant?: number; // არაწესიერი ფიგურების ვიზუალური ვარიანტისთვის
-  
-  // საერთო
-  answer: number;      // რიცხვი, რომელიც მომხმარებელმა უნდა შეიყვანოს
-}
+  sides?: number[];
+  shapeVariant?: number;
+  answer: number;
+};
 
 export enum GameState {
   Playing,
