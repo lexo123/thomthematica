@@ -12,6 +12,7 @@ export interface GameSessionState {
   totalQuestions: number;
   totalCorrect: number;
   streakCount: number;
+  recentAnswers: boolean[];
   questionsInBlock40: number;
   correctInBlock40: number;
   lastCompletedBlockCorrectCount: number;
@@ -38,6 +39,7 @@ export const INITIAL_GAME_SESSION_STATE: GameSessionState = {
   totalQuestions: 0,
   totalCorrect: 0,
   streakCount: 0,
+  recentAnswers: [],
   questionsInBlock40: 0,
   correctInBlock40: 0,
   lastCompletedBlockCorrectCount: 0,
@@ -58,21 +60,24 @@ export function gameSessionReducer(state: GameSessionState, action: GameSessionA
       const newTotalCorrect = state.totalCorrect + (isCorrect ? 1 : 0);
       const newStreakCount = isCorrect ? state.streakCount + 1 : 0;
       
-      const newQuestionsInBlock40 = state.questionsInBlock40 + 1;
-      const newCorrectInBlock40 = state.correctInBlock40 + (isCorrect ? 1 : 0);
+      const currentRecent = state.recentAnswers || [];
+      const updatedRecentAnswers = [...currentRecent, isCorrect].slice(-40);
+      const windowSize = updatedRecentAnswers.length;
+      const correctInWindow = updatedRecentAnswers.filter(Boolean).length;
 
-      let newPerfectBlocksCount = state.perfectBlocksCount;
-      let nextQuestionsInBlock40 = newQuestionsInBlock40;
-      let nextCorrectInBlock40 = newCorrectInBlock40;
+      const isWishQualified = windowSize === 40 && correctInWindow >= 39;
+
+      let nextRecentAnswers = updatedRecentAnswers;
       let lastCompletedBlockCorrectCount = state.lastCompletedBlockCorrectCount;
+      let perfectBlocksCount = state.perfectBlocksCount;
 
-      if (newQuestionsInBlock40 === 40) {
-        lastCompletedBlockCorrectCount = newCorrectInBlock40;
-        if (newCorrectInBlock40 === 40) {
-          newPerfectBlocksCount += 1;
+      if (isWishQualified) {
+        lastCompletedBlockCorrectCount = correctInWindow;
+        if (correctInWindow === 40) {
+          perfectBlocksCount += 1;
         }
-        nextQuestionsInBlock40 = 0;
-        nextCorrectInBlock40 = 0;
+        // Reset sliding window after achieving a qualified 40-question block
+        nextRecentAnswers = [];
       }
 
       return {
@@ -80,10 +85,11 @@ export function gameSessionReducer(state: GameSessionState, action: GameSessionA
         totalQuestions: newTotalQuestions,
         totalCorrect: newTotalCorrect,
         streakCount: newStreakCount,
-        questionsInBlock40: nextQuestionsInBlock40,
-        correctInBlock40: nextCorrectInBlock40,
+        recentAnswers: nextRecentAnswers,
+        questionsInBlock40: nextRecentAnswers.length,
+        correctInBlock40: nextRecentAnswers.filter(Boolean).length,
         lastCompletedBlockCorrectCount,
-        perfectBlocksCount: newPerfectBlocksCount,
+        perfectBlocksCount,
         feedback: isCorrect ? 'correct' : 'incorrect',
       };
     }
@@ -160,20 +166,21 @@ export const useGameSession = (gameMode: GameMode | null) => {
   }, [flushStats]);
 
   const recordAnswer = useCallback((isCorrect: boolean): { isBlock40Completed: boolean } => {
-    const isBlock40Completed = state.questionsInBlock40 + 1 === 40;
-    const currentBlockCorrectCount = state.correctInBlock40 + (isCorrect ? 1 : 0);
+    const currentRecent = state.recentAnswers || [];
+    const updatedRecent = [...currentRecent, isCorrect].slice(-40);
+    const isWishQualified = updatedRecent.length === 40 && updatedRecent.filter(Boolean).length >= 39;
 
     dispatch({ type: 'RECORD_ANSWER', isCorrect });
 
-    // Show wish modal ONLY if 39 or 40 questions were correct in the completed 40-question block
-    if (isBlock40Completed && currentBlockCorrectCount >= 39) {
+    // Show wish modal ONLY if 39 or 40 questions were correct in the completed 40-question rolling window
+    if (isWishQualified) {
       setTimeout(() => {
         dispatch({ type: 'SET_SHOW_WISH_MODAL', show: true });
       }, WISH_MODAL_DELAY_MS);
     }
 
-    return { isBlock40Completed };
-  }, [state.questionsInBlock40, state.correctInBlock40]);
+    return { isBlock40Completed: isWishQualified };
+  }, [state.recentAnswers]);
 
   const handleWishSubmit = useCallback(async (): Promise<boolean> => {
     if (!state.wishText.trim()) return false;
